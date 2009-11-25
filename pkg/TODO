@@ -1,0 +1,10 @@
+
+
+* weaken ggplot2 dependency, if possible
+* comparisons with PBSadmb?
+
+* add MCMC quantiles etc. to summary: 
+* confint method?
+
+* better setup detection:
+   comments on adcomp/adlink/admb scripts

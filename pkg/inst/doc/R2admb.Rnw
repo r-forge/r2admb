@@ -1,0 +1,158 @@
+%\VignettePackage{R2admb}
+%\VignetteIndexEntry{basic examples of R2admb/AD Model Builder use}
+%\VignetteDepends{ggplot2}
+%\VignetteDepends{bbmle}
+\documentclass[11pt]{article}
+\usepackage[american]{babel}
+\usepackage[utf8]{inputenc}
+\newcommand{\R}{{\sf R}}
+\newcommand{\Splus}{{\sf S-PLUS}}
+%\newcommand{\fixme}[1]{\textbf{FIXME: #1}}
+\newcommand{\fixme}[1]{}
+\newcommand{\windows}{\textbf W?}
+\usepackage{url}
+\usepackage{alltt}
+\usepackage{fancyvrb} % with VerbatimFootnotes, allow verb in footnotes
+\usepackage{listings}
+\usepackage{verbatim}
+\usepackage{hyperref}
+\newcommand{\code}[1]{{\tt #1}}
+\bibliographystyle{plain}
+
+\title{Using AD Model Builder and R together: getting started with the 
+  \code{R2admb} package}
+\author{Ben Bolker}
+\date{\today}
+\begin{document}
+\maketitle
+
+\SweaveOpts{keep.source=TRUE}
+\section{Installation}
+
+(Provide hints on where to find AD Model Builder \ldots)
+\begin{itemize}
+\item \url{http://admb-project.org/}
+\item \url{http://admb-project.org/downloads}
+\item \url{http://code.google.com/p/admb-project/}
+\item \url{http://code.google.com/p/admb-project/downloads/list}
+\end{itemize}
+
+\section{Basics}
+
+<<libs>>=
+library(R2admb)
+library(ggplot2)
+@ 
+
+<<dat1>>=
+ReedfrogSizepred <- 
+  data.frame(TBL = rep(c(9,12,21,25,37),each=3),
+             Kill = c(0,2,1,3,4,5,0,0,0,0,1,0,0,0,0L))
+@ 
+
+Initial view of the data (proportion killed):
+<<fig1,fig=TRUE>>=
+g1  <- ggplot(ReedfrogSizepred,
+             aes(x=TBL,y=Kill/10))+
+  geom_point()+stat_sum(aes(size=factor(..n..)))+
+  geom_smooth()+
+  theme_bw()+
+  labs(size="n",x="Size (total body length",
+       y="Proportion killed")+
+  coord_cartesian(ylim=c(-0.05,0.55))
+print(g1)
+@ 
+
+So if $p(\mbox{kill}) = c ((S/d) \exp(1-(S/d)))^g$
+(peak occurs at $S=d$, peak height=$c$) then
+a reasonable set of first estimates would be
+$c=0.45$, $d=13$.
+
+<<startval,fig=TRUE>>=
+startest <- stat_function(fun = function(x) { 0.45*((x/13)*exp(1-x/13)) },
+                          lty=2,colour="red")
+print(g1+startest)
+@ 
+(Not great, but perhaps adequate as a starting point.)
+
+<<mlefit>>=
+library(bbmle)
+m0 <- mle2(Kill~dbinom(c*((TBL/d)*exp(1-TBL/d))^g,size=10),
+           start=list(c=0.45,d=13,g=1),data=ReedfrogSizepred,
+           method="L-BFGS-B",
+           lower=c(c=0.003,d=10,g=0),
+           upper=c(c=0.8,d=20,g=20),
+           control=list(parscale=c(c=0.5,d=10,g=1)))
+@ 
+<<mlefitfig,fig=TRUE>>=
+TBLvec = seq(9.5,36,length=100)
+predfr <- 
+  data.frame(TBL=TBLvec,
+             Kill=predict(m0,newdata=data.frame(TBL=TBLvec)))
+print(g1+startest+
+      geom_line(data=predfr,colour="purple",lty=2))
+@ 
+
+Here's the TPL (AD Model Builder definition) file:
+
+\VerbatimInput[frame=single,numbers=left]{ReedfrogSizepred.tpl}
+
+<<admbfit1>>=
+setup_admb()
+m1 <- do_admb("ReedfrogSizepred",
+              input=c(list(nobs=nrow(ReedfrogSizepred),
+                nexposed=rep(10,nrow(ReedfrogSizepred))),
+                ReedfrogSizepred),
+              param_list=list(c=0.45,d=13,g=1),
+              clean=TRUE,verbose=TRUE)
+
+unlink("reedfrogsizepred.tpl")
+@ 
+
+Exercise the extractor methods:
+<<extractors>>=
+m1
+coef(m1)
+summary(m1)
+coef(summary(m1))
+vcov(m1)
+logLik(m1)
+deviance(m1)
+AIC(m1)
+@ 
+
+<<>>=
+m1MC <- do_admb("ReedfrogSizepred",
+              input=c(list(nobs=nrow(ReedfrogSizepred),
+                nexposed=rep(10,nrow(ReedfrogSizepred))),
+                ReedfrogSizepred),
+                mcmc=TRUE,
+                param_list=list(c=0.45,d=13,g=1),
+                clean=TRUE)
+unlink("reedfrogsizepred.tpl")
+@ 
+
+<<echo=FALSE>>=
+## clean up
+unlink("reedfrogsizepred")
+@ 
+
+<<fig=TRUE>>=
+print(plot(m1MC$hist))
+@ 
+
+<<>>=
+library(coda)
+HPDinterval(as.mcmc(m1MC$mcmc))
+@ 
+
+<<fig=TRUE>>=
+print(densityplot(as.mcmc(m1MC$mcmc)))
+@ 
+
+<<fig=TRUE>>=
+print(xyplot(as.mcmc(m1MC$mcmc)))
+@ 
+
+
+\end{document}

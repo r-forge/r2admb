@@ -1,0 +1,12 @@
+export(setup_admb,clean_admb,do_admb)
+import(ggplot2)
+
+S3method(print,admb)
+S3method(print,summary.admb)
+S3method(vcov,admb)
+S3method(AIC,admb)
+S3method(coef,admb)
+S3method(logLik,admb)
+S3method(deviance,admb)
+S3method(summary,admb)
+S3method(plot,admb_hist)
