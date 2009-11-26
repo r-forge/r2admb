@@ -401,10 +401,12 @@ read_tpl <- function(f) {
                  gsub("\\([)a-zA-Z0-9,. ]+$","",
                       grep( "^ +random",splsec$PARAMETER,
                            value=TRUE)))
+  sdlines <- grep( "^ +sdreport_number",splsec$PARAMETER,
+                           value=TRUE)
   sdnums <- gsub("^ +sdreport_number +","",
-                 gsub("\\([)a-zA-Z0-9,.;/ ]+$","",
-                      grep( "^ +sdreport_number",splsec$PARAMETER,
-                           value=TRUE)))
+                 gsub("//.*$","",sdlines))
+  sdnums <- strsplit(gsub(" *","",
+                          paste(sdnums,collapse="")),";")[[1]]
   sdvecs <- gsub("^ +sdreport_vector +","",
                  ## gsub("\\([)a-zA-Z0-9,.;/ ]+$","",
                  gsub(";.*$","",
@@ -455,10 +457,10 @@ read_admbbin <- function(fn) {
 function (name, L) 
 {
     n = nchar(name)
-    if (substring(name, n - 3, n) == ".dat") 
-        file_name = name
-    else file_name = paste(name, ".dat", sep = "")
-    cat("# \"", name, ".dat\" produced by dat_write() from ADMButils; ", 
+    if (substring(name, n - 3, n) == ".dat") {
+      file_name <- name
+    } else file_name <- paste(name, "dat", sep = ".")
+    cat("# \"", file_name,"\" produced by dat_write() from ADMButils; ", 
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
         x = L[[i]]
