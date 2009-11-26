@@ -37,6 +37,14 @@
 \item \url{http://code.google.com/p/admb-project/downloads/list}
 \end{itemize}
 
+Notes: (1) depending on your operating system etc., you
+may need to install a C++ compiler (in particular, the
+MacOS installation instructions will probably ask you
+to install gcc/g++ from the Xcode package); (2)
+you will need to have the scripts \code{admb}, \code{adcomp},
+and \code{adlink} in the \code{bin} directory of your
+ADMB installation.
+
 \section{Basics}
 
 <<libs>>=
@@ -97,15 +105,18 @@ Here's the TPL (AD Model Builder definition) file:
 
 \VerbatimInput[frame=single,numbers=left]{ReedfrogSizepred.tpl}
 
-<<admbfit1>>=
+<<admbfit_getruns,echo=FALSE>>=
+load("ADMB_runs.RData")
+@ 
+
+<<admbfit_fake,eval=FALSE>>=
 setup_admb()
 m1 <- do_admb("ReedfrogSizepred",
               input=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
               param_list=list(c=0.45,d=13,g=1),
-              clean=TRUE,verbose=TRUE)
-
+              clean=TRUE)
 unlink("reedfrogsizepred.tpl")
 @ 
 
@@ -121,7 +132,7 @@ deviance(m1)
 AIC(m1)
 @ 
 
-<<>>=
+<<admbfakemc,eval=FALSE>>=
 m1MC <- do_admb("ReedfrogSizepred",
               input=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
@@ -153,6 +164,5 @@ print(densityplot(as.mcmc(m1MC$mcmc)))
 <<fig=TRUE>>=
 print(xyplot(as.mcmc(m1MC$mcmc)))
 @ 
-
 
 \end{document}
