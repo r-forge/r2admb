@@ -31,4 +31,16 @@
 \author{
   Ben Bolker
 }
+\examples{
+  admbex <- system.file("doc","ADMB_runs.RData",package="R2admb")
+  load(admbex)
+  m1
+  coef(m1)
+  summary(m1)
+  coef(summary(m1)) ## returns just z-table
+  AIC(m1)
+  vcov(m1)
+  logLik(m1)
+  deviance(m1)
+}
 \keyword{misc}

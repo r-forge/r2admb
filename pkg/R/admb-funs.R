@@ -61,7 +61,7 @@ read_pars <- function (fn) {
   names(est) = names(std) = rownames(vcov) = rownames(cormat) =
     colnames(vcov) = colnames(cormat) = parnames
   if (!is.finite(loglik)) warning("bad log-likelihood: fitting problem in ADMB?")
-  list(coef=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
+  list(coefficients=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
 }
 
 do_admb = function(fn,input_list,param_list,
@@ -154,13 +154,13 @@ print.admb <- function(x, verbose=FALSE, ...) {
   }
   cat("Negative log-likelihood:",-x$loglik,"\n")
   cat("Coefficients:\n")
-  print(unlist(x$coef))
+  print(unlist(x$coefficients))
   if (verbose) cat(x$txt,sep="\n")
 }      
 
 summary.admb <- function(object, correlation=FALSE, symbolic.cor = FALSE, ...) {
-  p1 <- 1:length(object$coef)
-  coef.p <- unlist(object$coef)
+  p1 <- 1:length(object$coefficients)
+  coef.p <- unlist(object$coefficients)
   covmat <- object$vcov
   var.cf <- diag(covmat)
   s.err <- sqrt(var.cf)
@@ -318,6 +318,7 @@ plot.admb_hist <- function(x,type=c("lattice","ggplot"),
     xx <- rhist(x$hists,pars)
     if (type=="ggplot") {
       ## if (!require(ggplot2)) stop("must install ggplot2 package")
+      X1 <- ""; X2 <- ""  ## hack to circumvent NOTE in R CMD check
       vplot <- ggplot2::ggplot(xx,aes(x=X1,y=X2))+
         geom_step()+
           ## geom_bar(stat="identity",fill="darkgray")+

@@ -26,7 +26,9 @@ specified, this function will try to set it sensibly. (I.e., on Unix systems, it
 to find the binaries; on Windows it will assume they are installed in the default
 location (C:/ADMB).) (2) If ADMB_HOME is set and admb_home is not specified,
 it will leave the original setting alone. (3) If admb_home is specified, it
-will set the environment variable ADMB_HOME to that value.  It also appends
+will set the environment variable ADMB_HOME to that value.
+
+The function also appends
 the admb_home value to the PATH variable.
 }
 \value{
@@ -39,7 +41,9 @@ A character vector containing the name of the current ADMB_HOME.
   orig <- Sys.getenv("ADMB_HOME")
   setup_admb("elsewhere")   ## this doesn't make sense but won't break anything until you actually try to run AD Model Builder
   Sys.setenv(ADMB_HOME="") ## erase environment variable
-  setup_admb()              ## auto-locate
+\dontrun{
+  setup_admb()              ## auto-locate (fails if ADMB not found)
+}
   Sys.setenv(ADMB_HOME=orig) ## restore sanity
 }
 \keyword{misc}

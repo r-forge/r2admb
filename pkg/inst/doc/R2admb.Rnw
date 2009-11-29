@@ -165,4 +165,5 @@ print(densityplot(as.mcmc(m1MC$mcmc)))
 print(xyplot(as.mcmc(m1MC$mcmc)))
 @ 
 
+\section{Random effects: gopher tortoise data}
 \end{document}

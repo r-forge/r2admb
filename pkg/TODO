@@ -1,10 +1,23 @@
 
 
 * weaken ggplot2 dependency, if possible
+
 * comparisons with PBSadmb?
 
 * add MCMC quantiles etc. to summary: 
 * confint method?
+-   "quad" if only se/vcov known
+-   "profile"?
+-   MCMC: quantile/HPDinterval?
 
-* better setup detection:
+
+* better setup detection, error trapping:
    comments on adcomp/adlink/admb scripts
+
+* more checking of dat/pin files:
+  auto-construction of PARAMETERS section in tpl file?
+
+* test/document examples of random effects in vignette:
+  
+
+* ?? formula interface???
