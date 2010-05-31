@@ -1,7 +1,14 @@
 ## TO DO:
-##   bounds checking?
+##   finish bounds/phase support
+##    bounds checking?
+##   integrate writing/reading/checking
+##   add objective_function_value default
+##   check for random effects vectors (don't redefine)
+##   integrate sdreport stuff for MCMC
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
+
+
 
 setup_admb <- function(admb_home) {
   ## check whether already set up
@@ -34,6 +41,153 @@ setup_admb <- function(admb_home) {
   admb_home
 }
 
+check_section <- function(fn,
+                          tplsec,
+                          R_list,
+                          check,
+                          bounds,
+                          phase,
+                          secname,
+                          intcheck=c("strict","sloppy")) {
+  intcheck <- match.arg(intcheck)
+  Rnames  <- names(R_list)
+  msg <- ""
+  if (check!="write") {
+    info <- read_tpl(fn)[[tplsec]]
+    tplnames <- info$vname
+    if (length(setdiff(tplnames,Rnames))>0) {
+      msg <- paste("missing values in list:",
+                   paste(setdiff(tplnames,Rnames),sep=","))
+    } else if (length(setdiff(Rnames,tplnames))==0 && !all(tplnames==Rnames)) {
+      msg <- "all values present, but order doesn't match"
+    } else {
+      msg <- ""
+      attach(R_list,warn.conflicts=FALSE)
+      on.exit(detach(R_list))
+      ## now need to check dimensions etc...
+      for (i in 1:nrow(info)) {
+        v = info[i,]
+        x = get(v$vname)
+        v$type = gsub("init_","",v$type)
+        if (v$type %in% c("int","ivector","imatrix")) {
+          if (any(trunc(x)!=x)) msg <- paste(msg,v$vname,
+                     "non-integer;")
+        }
+        if (v$type %in% c("int","number")) {
+          if (length(x)>1) msg <- paste(msg,"length(",v$vname,
+                                        ")>1;")
+        }
+        if (v$type %in% c("ivector","vector")) {
+          if (any(is.na(c(v$X1,v$X2)))) {
+            msg <- paste(msg,"NAs in dimensions in ",v$vname)
+          } else {
+            tpllen = eval(parse(text=paste(v$X2,"-",v$X1)))+1
+            if (length(x)!=tpllen)
+              msg <- paste(msg,"length mismatch in ",v$vname,
+                           ": ",length(x)," (r) != ",tpllen," (tpl)",
+                           sep="")
+          }
+        }
+        if (v$type %in% c("imatrix","matrix")) {
+          tpldim = with(v,c(
+            eval(parse(text=paste(v$X2,"-",v$X1)))+1,
+            eval(parse(text=paste(v$X4,"-",v$X3)))+1))
+          rdim <- dim(x)
+          if (is.null(rdim)) {
+            msg <- paste(msg,v$vname,"not a matrix;")
+          } else {
+            if (any(rdim!=tpldim))
+            msg <- paste(msg,"dimension mismatch in ",v$vname,
+                         ": (",rdim[1],",",rdim[2],"), (r) != ",
+                         " (",tpldim[1],",",tpldim[2],") (tpl)",
+                         sep="")
+          } ## dimensions
+        } ## if matrix
+        if (length(grep(v$type,"array"))>0) {
+          arraydim = as.numeric(substr(v$type,1,1))
+          tpldim = numeric(arraydim)
+          for (j in 1:arraydim) {
+            tpldim[j] <-
+              eval(parse(text=paste(v[2*j+2],"-",v[2*j+1])))+1
+          }
+          rdim <- dim(x)
+          if (is.null(rdim)) {
+            msg <- paste(msg,v$vname,"not an array;")
+          } else {
+            if (any(rdim!=tpldim))
+              msg <- paste(msg,"dimension mismatch in ",v$vname,
+                         ": (",
+                           paste(rdim,sep=","),"), (r) != ",
+                         " (",
+                           paste(tpldim,sep=","),") (tpl)",
+                         sep="")
+          } ## !is.null(rdim)
+        } ## array
+      } ## loop over variables
+    } ## checking
+    return(msg)
+  } else { ## check=="write"
+    ## WRITING THE TPL SECTION
+    ## FIXME: handle bounds, phases, and 1D matrices??
+    ## bounds: list OR (named) 2-col matrix or 2xn matrix
+    ## phases: list OR (named) vector or n-vector
+    ## arrays must be 1-based: if you want zero-based arrays
+    ##     then write the TPL section yourself
+    if (!missing(bounds) || !missing(phase))
+      warning("bounds and phase support incomplete")
+    secstr <- paste(secname,"_SECTION",sep="")
+    for (i in 1:length(R_list)) {
+      x <- R_list[[i]]
+      n <- names(R_list)[i]
+      is.int <- function(x) {
+        ((intcheck=="strict" && storage.mode(x)=="integer") |
+         (intcheck=="trunc" && all(trunc(x)==x)))}
+      if (is.int(x) && !is.null(dim(x)) &&
+          length(dim(x))>2) {
+        stop("can't handle integer arrays of dimension>2")
+      }
+      if (is.int(x)) {
+        if (length(x)==1 && is.null(dim(x))) {
+          secstr[i+1] = paste("init_int",n)
+        } else if (length(x)>1 && is.null(dim(x))) {
+          secstr[i+1] = paste("init_ivector ",n," (1,",length(x),")",sep="")
+        } else if (!is.null(dim(x)) && length(dim(x))==2) {
+          secstr[i+1] = paste("init_imatrix",n,
+                  " (1,",dim(x)[1],",1,",dim(x)[2],")")
+        }
+      } else if (storage.mode(x) %in% c("numeric","double")) {
+        if (length(x)==1 && is.null(dim(x))) {
+          if (n %in% names(bounds)) {
+            secstr[i+1] = paste("init_bounded_number ",n,
+                    "(",c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
+          } else {
+            secstr[i+1] = paste("init_number",n)
+          }
+        } else if (length(x)>1 && is.null(dim(x))) {
+          secstr[i+1] = paste("init_vector ",n,"(1,",length(x),")",sep="")
+        } else if (!is.null(dim(x)) && length(dim(x))==2) {
+          secstr[i+1] = paste("init_matrix ",n,
+                  " (1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
+        } else if (!is.null(dim(x)) && length(dim(x))>2) {
+          ndim <- length(dim(x))
+          if (ndim>7) stop("can't handle arrays of dim>7")
+          secstr[i+1] = paste("init_",ndim,"array",
+                  n," (",
+                  paste(c(rbind(rep(1,ndim),dim(x))),
+                        collapse=","),")",sep="")
+        } ## multi-dim array
+      } else stop("can only handle numeric values")
+    } ## loop over R list
+    fn2 <- paste(fn,".tpl",sep="")
+    file.copy(fn2,
+              paste(fn,".tpl.bak",sep=""))
+    ff <- readLines(fn2)
+    ff <- c(secstr,"",ff)
+    writeLines(ff,con=fn2)
+    return(msg)
+  }
+}
+
 read_pars <- function (fn) {
   rt <- function(f,...) {
     if (file.exists(f)) read.table(f,...) else NA
@@ -64,21 +218,29 @@ read_pars <- function (fn) {
   list(coefficients=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
 }
 
-do_admb = function(fn,input_list,param_list,
+do_admb = function(fn,
+  data_list,param_list,
   re=FALSE,
   safe=TRUE,
   mcmc=FALSE,
   mcmc2=FALSE,
   mcmcsteps=1000,
   mcmcsave=round(mcmcsteps/1000),
+  mcmcpars,
   impsamp=FALSE,
   verbose=FALSE,
   wd=getwd(),
-  clean=FALSE) {
+  checkparam=c("stop","warn","write","ignore"),
+  checkdata=c("stop","warn","write","ignore"),
+  clean=FALSE,
+  extra.args) {
   ## TO DO: check to see if executables are found
+  checkparam <- match.arg(checkparam)
+  checkdata <- match.arg(checkdata)
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
   if (!re && mcmc2) stop("mcmc2 only applies when re=TRUE")
   tplfile = paste(fn,"tpl",sep=".")
+  tplinfo <- read_tpl(fn)
   ofn <- fn
   if (!tolower(fn)==fn) {
     warning("base name converted to lower case for ADMB compatibility")
@@ -92,6 +254,22 @@ do_admb = function(fn,input_list,param_list,
   ## }
   if (!file.exists(tplfile))
     stop("could not find TPL file ",tplfile)
+  dmsg <- check_section(ofn,"data",data_list,
+                        check=checkdata,
+                        ## lower,upper,
+                        secname="PARAMETER")
+  if (nchar(dmsg)>0) {
+    if (checkdata=="stop") stop(dmsg)
+    if (checkdata=="warn") warning(dmsg)
+  }
+  dmsg <- check_section(ofn,"inits",param_list,
+                        check=checkparam,
+                        ## lower,upper,
+                        secname="")
+  if (nchar(dmsg)>0) {
+    if (checkparam=="stop") stop(pmsg)
+    if (checkparam=="warn") warning(pmsg)
+  }
   args = ""
   if (re) args = "-r"
   if (safe) args = paste(args,"-s")
@@ -105,12 +283,16 @@ do_admb = function(fn,input_list,param_list,
     cat(coutfile,sep="\n")
   }
   ##  if (length(grep("error",coutfile)>0))
-  if (length(coutfile)>0)
+  ## HACK for ignorable ADMB-RE error messages
+  cred <- coutfile[!substr(coutfile,1,85) %in%
+                   c("cat: xxalloc4.tmp: No such file or directory",
+                     "cat: xxalloc5.tmp: No such file or directory",                               "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
+  if (length(cred)>0)
     stop("errors detected in compilation: run with verbose=TRUE to view")
   ## insert check(s) for failure at this point
-  if (verbose) cat("writing data and input files ...\n")
+  if (verbose) cat("writing data and parameter files ...\n")
   ## check order of data; length of vectors???
-  dat_write(fn,input_list)
+  dat_write(fn,data_list)
   ## check order of parameters ??
   pin_write(fn,param_list)
   args <- ""
@@ -118,6 +300,9 @@ do_admb = function(fn,input_list,param_list,
     args = paste(args,"-mcmc",mcmcsteps)
     if (mcmcsave>0)
       args = paste(args,"-mcsave",mcmcsave)
+  }
+  if (!missing(extra.args)) {
+    args <- paste(args,extra.args)
   }
   if (verbose) cat("running compiled executable with args: '",args,"'...\n")
   res = system(paste("./",ofn,args," 2>",fn,".out",sep=""),intern=TRUE)
@@ -155,6 +340,9 @@ print.admb <- function(x, verbose=FALSE, ...) {
   cat("Negative log-likelihood:",-x$loglik,"\n")
   cat("Coefficients:\n")
   print(unlist(x$coefficients))
+  if (!is.null(x$mcmc)) {
+    cat("MCMC: ",nrow(x$mcmc)," steps\n")
+  }
   if (verbose) cat(x$txt,sep="\n")
 }      
 
@@ -187,7 +375,7 @@ print.summary.admb <- function(x,
             na.print = "NA", ...)
 }
 
-coef.admb <- function(object,...) object$coef
+coef.admb <- function(object,...) object$coefficients
 logLik.admb <- function(object,...) object$loglik
 vcov.admb <- function(object,...) object$vcov
 deviance.admb <- function(object,...) -2*object$loglik
@@ -386,45 +574,78 @@ if (FALSE) {
     facet_wrap(~variable,scale="free")
 }
 
+
+strip_comments <- function(s) {
+  ## strip comments (and terminal whitespace)
+  gsub("[ \\\t]*//.*$","",s)
+}
+
+proc_var <- function(s,drop.first=TRUE) {
+  if (drop.first) s <- s[-1]
+  ## strip comments & whitespace
+  s2 <- gsub("^ *","",gsub("[;]*[ \\\t]*$","",strip_comments(s)))
+  s2 <- s2[nchar(s2)>0] 
+  words <- strsplit(s2," ")
+  type <- sapply(words,"[[",1)
+  rest <- sapply(words,"[[",2)
+  rest2 <- strsplit(gsub("[(),]"," ",rest)," ")
+  vname <- sapply(rest2,"[[",1)
+  maxlen <- max(sapply(rest2,length))
+  opts <- t(sapply(rest2,
+           function(w) {
+             ## as.numeric()?
+             c(w[-1],rep(NA,maxlen+1-length(w)))
+           }))
+  data.frame(type,vname,opts,stringsAsFactors=FALSE)
+}
+
+drop_calcs <- function(s) {
+  startcalc <- grep("^ *LOC_CALCS",s)
+  endcalc <- grep("^ *END_CALCS",s)
+  if (length(endcalc)==0) endcalc <- length(s)
+  if (length(startcalc)>0) {
+    s <- s[-(startcalc:endcalc)]
+  }
+  commcalc <- grep("^ +!!",s)
+  if (length(commcalc)>0) s <- s[-commcalc]
+  s
+}
+
 read_tpl <- function(f) {
   r <- readLines(paste(f,"tpl",sep="."))
   secStart <- which(substr(r,1,1) %in% LETTERS)
+  if (secStart[1]!=1) { ## add first (comments etc.) section
+    secStart <- c(1,secStart)
+  }
   nsec <- length(secStart)
+  ## length (in lines) of each chunk
   L <- c(secStart[-1],length(r)+1)-secStart
   sec <- rep(1:nsec,L)
   splsec <- split(r,sec)
-  names(splsec) <- gsub("_[A-Z]+","",sapply(splsec,"[",1))
-  inits <- gsub("^ +init[a-z_]+ ","",
-                gsub("\\([)a-zA-Z0-9,. ]+$","",
-                     grep( "^ +init",splsec$PARAMETER,
-                          value=TRUE)))
-  raneff <- gsub("^ +random[a-z_]+ ","",
-                 gsub("\\([)a-zA-Z0-9,. ]+$","",
-                      grep( "^ +random",splsec$PARAMETER,
-                           value=TRUE)))
-  sdlines <- grep( "^ +sdreport_number",splsec$PARAMETER,
-                           value=TRUE)
-  sdnums <- gsub("^ +sdreport_number +","",
-                 gsub("//.*$","",sdlines))
-  sdnums <- strsplit(gsub(" *","",
-                          paste(sdnums,collapse="")),";")[[1]]
-  sdvecs <- gsub("^ +sdreport_vector +","",
-                 ## gsub("\\([)a-zA-Z0-9,.;/ ]+$","",
-                 gsub(";.*$","",
-                           grep( "^ +sdreport_vector",splsec$PARAMETER,
-                                value=TRUE)))
-  sdvecdims <- gsub("^ +sdreport_vector[ a-zA-Z]+","",
-                 gsub("[()]","",
-                      grep( "^ +sdreport_vector",splsec$PARAMETER,
-                           value=TRUE)))
-
-  profparms <- gsub("^ +likeprof[a-z_]+ ","",
-                 gsub("\\([)a-zA-Z0-9,. ]+$","",
-                      grep( "^ +likeprof",splsec$PARAMETER,
-                           value=TRUE)))
-
-  list(inits=inits,raneff=raneff,
-       sdnums=sdnums,sdvecs=sdvecs,profparms=profparms)
+  ## not QUITE right: we get some stuff in here that is not
+  ##  a "SECTION" but is SEPARABLE_FUNCTION or TOP_OF_MAIN_CALCS
+  ##  or something ...
+  names(splsec) <- gsub("_.+","",sapply(splsec,"[",1))
+  splsec_proc <- lapply(splsec,drop_calcs)
+  splsec_proc <- lapply(splsec_proc[c("PARAMETER","DATA")],proc_var)
+  pp <- splsec_proc$PARAMETER
+  type <- 1 ## kluge for R CMD check warnings; will be masked
+  L1 <- with(pp,
+             list(inits=pp[grep("^init",type),],
+                  raneff=pp[grep("^random",type),],
+                  sdnums=pp[grep("^sdreport_number",type),],
+                  sdvecs=pp[grep("^sdreport_vector",type),],
+                  ## FIXME: don't know what I needed this for
+                  ## sdvecdims <- gsub("^ +sdreport_vector[ a-zA-Z]+","",
+                  ## gsub("[()]","",
+                  ## grep( "^ +sdreport_vector",splsec$PARAMETER,
+                  ## value=TRUE)))
+                  profparms=pp[grep("^likeprof",type),]))
+  pp <- splsec_proc$DATA
+  L2 <- with(pp,
+             list(data=pp[grep("^init",type),]))
+  L <- c(L1,L2)
+  L[sapply(L,nrow)>0]
 }
 
 read_psv <- function(f) {
@@ -433,8 +654,8 @@ read_psv <- function(f) {
   fn <- paste(f,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
   ans <- read_admbbin(fn)
-  nnums <- length(tpl$sdnums)
-  colnames(ans) <- c(tpl$sdnums,rep("",ncol(ans)-nnums))
+  nnums <- nrow(tpl$sdnums)
+  colnames(ans) <- c(tpl$sdnums$vname,rep("",ncol(ans)-nnums))
   ## assume parameters come before random effects?
   ans <- as.data.frame(ans)
   ans
@@ -461,7 +682,7 @@ function (name, L)
     if (substring(name, n - 3, n) == ".dat") {
       file_name <- name
     } else file_name <- paste(name, "dat", sep = ".")
-    cat("# \"", file_name,"\" produced by dat_write() from ADMButils; ", 
+    cat("# \"", file_name,"\" produced by dat_write() from R2admb ", 
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
         x = L[[i]]
@@ -485,7 +706,7 @@ function (name, L)
     if (substring(name, n - 3, n) == ".pin") 
         file_name = name
     else file_name = paste(name, ".pin", sep = "")
-    cat("# \"", name, ".pin\" produced by pin_write() from ADMButils; ", 
+    cat("# \"", name, ".pin\" produced by pin_write() from R2admb ", 
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
         x = L[[i]]
@@ -500,3 +721,23 @@ function (name, L)
         }
     }
 }
+
+
+if (FALSE) {
+  ## test: can we read all ADMB examples without crashing?
+  dir = "/usr/local/src/admb/examples/admb/"
+  dir = "/usr/local/src/admb/examples/admb-re/"
+  setwd(dir)
+  ## omit files with '.' (happen to be non-directories)
+  L = list.files(pattern="^[a-zA-Z_]+$")
+  source("/home/ben/lib/R/pkgs/r2admb/pkg/R/admb-funs.R")
+  for (i in seq_along(L)) {
+    setwd(file.path(dir,L[i]))
+    tpls <- gsub(".tpl","",list.files(pattern=".tpl"))
+    for (j in seq_along(tpls)) {
+      cat(L[i],tpls[j],"\n")
+      invisible(read_tpl(tpls[j]))
+    }
+  }
+}
+
