@@ -112,7 +112,7 @@ load("ADMB_runs.RData")
 <<admbfit_fake,eval=FALSE>>=
 setup_admb()
 m1 <- do_admb("ReedfrogSizepred",
-              input=c(list(nobs=nrow(ReedfrogSizepred),
+              data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
               param_list=list(c=0.45,d=13,g=1),
@@ -134,7 +134,7 @@ AIC(m1)
 
 <<admbfakemc,eval=FALSE>>=
 m1MC <- do_admb("ReedfrogSizepred",
-              input=c(list(nobs=nrow(ReedfrogSizepred),
+              data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
                 mcmc=TRUE,

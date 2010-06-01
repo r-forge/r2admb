@@ -1,5 +1,4 @@
 
-
 * weaken ggplot2 dependency, if possible
 
 * comparisons with PBSadmb?
@@ -15,9 +14,15 @@
    comments on adcomp/adlink/admb scripts
 
 * more checking of dat/pin files:
-  auto-construction of PARAMETERS section in tpl file?
+  auto-construction of PARAMETERS/INIT section in tpl file?
+ (Maunder)
 
 * test/document examples of random effects in vignette:
   
-
 * ?? formula interface???
+
+* profiling?
+
+* read bar (binary) rather than par file?
+
+* evaluate objection function by fixing vals

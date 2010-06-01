@@ -267,8 +267,8 @@ do_admb = function(fn,
                         ## lower,upper,
                         secname="")
   if (nchar(dmsg)>0) {
-    if (checkparam=="stop") stop(pmsg)
-    if (checkparam=="warn") warning(pmsg)
+    if (checkparam=="stop") stop(dmsg)
+    if (checkparam=="warn") warning(dmsg)
   }
   args = ""
   if (re) args = "-r"
