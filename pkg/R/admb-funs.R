@@ -13,8 +13,6 @@
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
 
-
-
 setup_admb <- function(admb_home) {
   ## check whether already set up
   sys_home <- Sys.getenv("ADMB_HOME")
@@ -52,6 +50,7 @@ setup_admb <- function(admb_home) {
 }
 
 check_section <- function(fn,
+                          tpldat,
                           tplsec,
                           R_list,
                           check,
@@ -61,11 +60,14 @@ check_section <- function(fn,
                           secname,
                           objfunname="f",
                           intcheck=c("strict","sloppy")) {
+  indent <- function(str,n=2) {
+    paste(paste(rep(" ",n),collapse=""),str,sep="")
+  }
   intcheck <- match.arg(intcheck)
   Rnames  <- names(R_list)
   msg <- ""
   if (check!="write") {
-    info <- read_tpl(fn)[[tplsec]]
+    info <- tpldat$info[[tplsec]]
     tplnames <- info$vname
     if (length(setdiff(tplnames,Rnames))>0) {
       msg <- paste("missing values in list:",
@@ -75,7 +77,7 @@ check_section <- function(fn,
     } else {
       msg <- ""
       attach(R_list,warn.conflicts=FALSE)
-      on.exit(detach(R_list))
+      on.exit(detach(R_list),add=TRUE)
       ## now need to check dimensions etc...
       for (i in 1:nrow(info)) {
         v = info[i,]
@@ -147,15 +149,15 @@ check_section <- function(fn,
     ##     then write the TPL section yourself
     if (!missing(bounds) || !missing(phase))
       warning("bounds and phase support incomplete")
-    secstr <- paste(secname,"_SECTION",sep="")
-    ind <- 1 ## current line index
+    ## no existing section: need title line
+    sectitle <- paste(secname,"_SECTION",sep="")
+    nvals <- length(R_list)
+    objstr <- NULL
     if (secname=="PARAMETER") {
       if (is.null(objfunname)) stop("must specify a name for the objective function")
-      ind <- ind+1
-      secstr[ind] <- paste("objective_function_value",objfunname)
+      objstr <- indent(paste("objective_function_value",objfunname))
     }
-    ## extending vector by addressing it -- very inefficient but
-    ##   probably insignificant
+    parstr <- character(nvals)
     for (i in 1:length(R_list)) {
       x <- R_list[[i]]
       n <- names(R_list)[i]
@@ -168,57 +170,54 @@ check_section <- function(fn,
       }
       if (is.int(x)) {
         if (length(x)==1 && is.null(dim(x))) {
-          secstr[i+ind] = paste("init_int",n)
+          parstr[i] = paste("init_int",n)
         } else if (length(x)>1 && is.null(dim(x))) {
-          secstr[i+ind] = paste("init_ivector ",n," (1,",length(x),")",sep="")
+          parstr[i] = paste("init_ivector ",n," (1,",length(x),")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          secstr[i+ind] = paste("init_imatrix",n,
+          parstr[i] = paste("init_imatrix",n,
                   " (1,",dim(x)[1],",1,",dim(x)[2],")")
         }
       } else if (storage.mode(x) %in% c("numeric","double")) {
         if (length(x)==1 && is.null(dim(x))) {
           if (!is.null(bounds) && n %in% names(bounds)) {
-            secstr[i+ind] = paste("init_bounded_number ",n,
+            parstr[i] = paste("init_bounded_number ",n,
                     "(",c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
           } else {
-            secstr[i+ind] = paste("init_number",n)
+            parstr[i] = paste("init_number",n)
           }
         } else if (length(x)>1 && is.null(dim(x))) {
-          secstr[i+ind] = paste("init_vector ",n,"(1,",length(x),")",sep="")
+          parstr[i] = paste("init_vector ",n,"(1,",length(x),")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          secstr[i+ind] = paste("init_matrix ",n,
+          parstr[i] = paste("init_matrix ",n,
                   "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))>2) {
           ndim <- length(dim(x))
           if (ndim>7) stop("can't handle arrays of dim>7")
-          secstr[i+ind] = paste("init_",ndim,"array",
+          parstr[i] = paste("init_",ndim,"array",
                   n," (",
                   paste(c(rbind(rep(1,ndim),dim(x))),
                         collapse=","),")",sep="")
         } ## multi-dim array
       } else stop("can only handle numeric values")
     } ## loop over R list
-    ## random effects vectors must come LAST
-    ind <- ind+length(R_list)
+    parstr <- indent(parstr)
+    cursec <- tpldat$secs[[secname]]
+    if (!is.null(cursec)) {
+      browser()
+      cursec <- cursec[-1] ## drop title
+      cursec <- grep("^ *$",cursec,invert=TRUE,value=TRUE)  ## drop blank lines
+    }
+    restr <- NULL
     if (secname=="PARAMETER") {
       if (!is.null(re_vectors)) {
         nre <- length(re_vectors)
+        restr <- character(nre)
         if (is.list(re_vectors)) re_vectors <- unlist(re_vectors)
-        secstr[(ind+1):(ind+nre)] <-
-          paste("random_effects_vector ",names(re_vectors),
-                "(1,",re_vectors,")",sep="")
-        ind <- ind+nre
+        restr <- indent(paste("random_effects_vector ",names(re_vectors),
+                "(1,",re_vectors,")",sep=""))
       }
     }
-    secstr[-1] <- paste("  ",secstr[-1],sep="") ## indent all but first line
-    ## now write it
-    fn2 <- paste(fn,".tpl",sep="")
-    file.copy(fn2,
-              paste(fn,".tpl.bak",sep=""))
-    ff <- readLines(fn2)
-    ff <- c(secstr,"",ff)
-    writeLines(ff,con=fn2)
-    return(msg)
+    return(c(sectitle,"",objstr,parstr,cursec,restr))
   }
 }
 
@@ -286,7 +285,8 @@ do_admb = function(fn,
     }
   }
   tplfile = paste(fn,"tpl",sep=".")
-  tplinfo <- read_tpl(fn)  ## extract info from TPL file
+  tpldat <- read_tpl(fn)  ## extract info from TPL file
+  tplinfo <- tpldat$info
   ofn <- fn
   if (!tolower(fn)==fn) {
     warning("base name converted to lower case for ADMB compatibility")
@@ -300,36 +300,56 @@ do_admb = function(fn,
   ## }
   if (!file.exists(tplfile))
     stop("could not find TPL file ",tplfile)
-  if (!checkdata %in% c("write","ignore") && is.null(tplinfo$inits))
-    stop("must specify PARAMETER section (or set 'checkdata' to 'write' or 'ignore')")
-  if (checkdata=="write" && !is.null(tplinfo$inits)) {
-    stop("checkdata='write' but PARAMETER section already present in TPL file")
-  }
-  dmsg <- check_section(ofn,"inits",param_list,
+  ### check PARAMETER section
+  if (!checkparam %in% c("write","ignore") && is.null(tplinfo$inits))
+    stop("must specify PARAMETER section (or set 'checkparam' to 'write' or 'ignore')")
+  dmsg <- check_section(ofn,tpldat,"inits",param_list,
                         check=checkparam,
                         bounds=param_bounds,
                         secname="PARAMETER",
                         objfunname=objfunname,
                         re_vectors=re_vectors)
-  if (nchar(dmsg)>0) {
+  if (!checkparam %in% c("write","ignore") && nchar(dmsg)>0) {
     if (checkparam=="stop") stop(dmsg)
     if (checkparam=="warn") warning(dmsg)
+  } else if (checkparam=="write") {
+    if (!is.null(tpldat$secs$PARAMETER)) {
+      tpldat$secs$PARAMETER <- dmsg
+    } else {
+      ## insert immediately before PROCEDURE
+      tpldat$secs <- append(tpldat$secs,list(PARAMETER=c(dmsg,"")),
+                            after=which(names(tpldat$secs)=="PROCEDURE")-1)
+    }
   }
-  ## check DATA section **after** parameter section because
-  ## in the checkdata=='write' case it will get prepended,
-  ## and we need to have DATA_SECTION come first in the tpl file
+  ## check DATA section
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
     stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
-  if (checkdata=="write" && !is.null(tplinfo$data)) {
-    stop("checkdata='write' but DATA section already present in TPL file")
-  }
-  dmsg <- check_section(ofn,"data",data_list,
+  dmsg <- check_section(ofn,tpldat,"data",data_list,
                         check=checkdata,
-                        ## lower,upper,
                         secname="DATA")
-  if (nchar(dmsg)>0) {
+  if (!checkdata %in% c("write","ignore") && nchar(dmsg)>0) {
     if (checkdata=="stop") stop(dmsg)
     if (checkdata=="warn") warning(dmsg)
+    
+  } else if (checkdata=="write") {
+    if (!is.null(tpldat$secs$DATA)) {
+      tpldat$secs$DATA <- dmsg
+    } else {
+      ## insert immediately before PARAMETER
+      tpldat$secs <- append(tpldat$secs,list(DATA=c(dmsg,"")),
+                            after=which(names(tpldat$secs)=="PARAMETER")-1)
+    }
+  }
+  ##
+  if (checkdata=="write" || checkparam=="write") {
+    fn2 <- paste(fn,".tpl",sep="")
+    fn2gen <- paste(fn,"_gen.tpl",sep="")
+    fn2bak<- paste(fn,".tpl.bak",sep="")
+    file.copy(fn2,fn2bak)
+    ## on exit, copy auto-generated file and restore original ...
+    on.exit(file.copy(fn2,fn2gen,overwrite=TRUE),add=TRUE)
+    on.exit(file.copy(fn2bak,fn2,overwrite=TRUE),add=TRUE)
+    writeLines(do.call("c",tpldat$secs),con=fn2)
   }
   args = ""
   if (re) args = "-r"
@@ -687,7 +707,8 @@ read_tpl <- function(f) {
   ## not QUITE right: we get some stuff in here that is not
   ##  a "SECTION" but is SEPARABLE_FUNCTION or TOP_OF_MAIN_CALCS
   ##  or something ...
-  names(splsec) <- gsub("_.+","",sapply(splsec,"[",1))
+  splnames <- sapply(splsec,"[",1)
+  names(splsec) <- gsub("_.+","",splnames)
   splsec_proc <- lapply(splsec,drop_calcs)
   L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
@@ -714,11 +735,11 @@ read_tpl <- function(f) {
   }
   L <- c(L1,L2)
   L <- L[!sapply(L,is.null)]
-  L[sapply(L,nrow)>0]
+  list(secs=splsec,info=L[sapply(L,nrow)>0])
 }
 
 read_psv <- function(f) {
-  tpl <- read_tpl(f)
+  tpl <- read_tpl(f)$info
   f <- tolower(f) ## argh
   fn <- paste(f,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
@@ -805,7 +826,7 @@ if (FALSE) {
     tpls <- gsub(".tpl","",list.files(pattern=".tpl"))
     for (j in seq_along(tpls)) {
       cat(L[i],tpls[j],"\n")
-      invisible(read_tpl(tpls[j]))
+      invisible(read_tpl(tpls[j])$info)
     }
   }
 }
