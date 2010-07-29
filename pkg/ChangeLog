@@ -1,3 +1,8 @@
+2010-07-29  Ben Bolker  <ben@bolker-lap2>
+
+	* major updates, especially to automatic creation of PARAMETERS and DATA sections
+	in TPL files (unfinished ...)
+
 2009-11-25  Ben Bolker  <bolker@ufl.edu>
 
 	* initial release

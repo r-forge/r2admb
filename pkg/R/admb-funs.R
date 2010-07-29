@@ -2,7 +2,12 @@
 ##   finish bounds/phase support
 ##    bounds checking?
 ##   integrate writing/reading/checking
-##   add objective_function_value default
+##       if 'write', check if sections already exist:
+##         ignore? error?
+##    NEED TO BE ABLE TO APPEND TO EXISTING parameter sections
+##     CHANGE BEHAVIOR -- should be able to re-run the same
+##       code without errors the second time.  Copy to temporary file??
+##   check for variables with "." in the name: stop? change to "_" and warn?      
 ##   check for random effects vectors (don't redefine)
 ##   integrate sdreport stuff for MCMC
 ##   parameter/data order checking?
@@ -25,6 +30,11 @@ setup_admb <- function(admb_home) {
         ## (2) check that it finds something, (3) try to
         ## use 'default' location??
         admb_home <- gsub("bin/admb","",system("locate bin/admb",intern=TRUE))
+        if (length(admb_home)>1) {
+          warning("'locate' found more than one instance of bin/admb: using last")
+          ## FIXME: query user?
+          admb_home <- admb_home[length(admb_home)]
+        }
       }
       if (.Platform$OS.type=="windows") {
         ## default location from IDE setup
@@ -47,7 +57,9 @@ check_section <- function(fn,
                           check,
                           bounds,
                           phase,
+                          re_vectors,
                           secname,
+                          objfunname="f",
                           intcheck=c("strict","sloppy")) {
   intcheck <- match.arg(intcheck)
   Rnames  <- names(R_list)
@@ -88,7 +100,7 @@ check_section <- function(fn,
                            sep="")
           }
         }
-        if (v$type %in% c("imatrix","matrix")) {
+        if (v$type %in% c("imatrix","matrix")) { 
           tpldim = with(v,c(
             eval(parse(text=paste(v$X2,"-",v$X1)))+1,
             eval(parse(text=paste(v$X4,"-",v$X3)))+1))
@@ -136,6 +148,14 @@ check_section <- function(fn,
     if (!missing(bounds) || !missing(phase))
       warning("bounds and phase support incomplete")
     secstr <- paste(secname,"_SECTION",sep="")
+    ind <- 1 ## current line index
+    if (secname=="PARAMETER") {
+      if (is.null(objfunname)) stop("must specify a name for the objective function")
+      ind <- ind+1
+      secstr[ind] <- paste("objective_function_value",objfunname)
+    }
+    ## extending vector by addressing it -- very inefficient but
+    ##   probably insignificant
     for (i in 1:length(R_list)) {
       x <- R_list[[i]]
       n <- names(R_list)[i]
@@ -148,36 +168,50 @@ check_section <- function(fn,
       }
       if (is.int(x)) {
         if (length(x)==1 && is.null(dim(x))) {
-          secstr[i+1] = paste("init_int",n)
+          secstr[i+ind] = paste("init_int",n)
         } else if (length(x)>1 && is.null(dim(x))) {
-          secstr[i+1] = paste("init_ivector ",n," (1,",length(x),")",sep="")
+          secstr[i+ind] = paste("init_ivector ",n," (1,",length(x),")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          secstr[i+1] = paste("init_imatrix",n,
+          secstr[i+ind] = paste("init_imatrix",n,
                   " (1,",dim(x)[1],",1,",dim(x)[2],")")
         }
       } else if (storage.mode(x) %in% c("numeric","double")) {
         if (length(x)==1 && is.null(dim(x))) {
-          if (n %in% names(bounds)) {
-            secstr[i+1] = paste("init_bounded_number ",n,
+          if (!is.null(bounds) && n %in% names(bounds)) {
+            secstr[i+ind] = paste("init_bounded_number ",n,
                     "(",c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
           } else {
-            secstr[i+1] = paste("init_number",n)
+            secstr[i+ind] = paste("init_number",n)
           }
         } else if (length(x)>1 && is.null(dim(x))) {
-          secstr[i+1] = paste("init_vector ",n,"(1,",length(x),")",sep="")
+          secstr[i+ind] = paste("init_vector ",n,"(1,",length(x),")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          secstr[i+1] = paste("init_matrix ",n,
-                  " (1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
+          secstr[i+ind] = paste("init_matrix ",n,
+                  "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))>2) {
           ndim <- length(dim(x))
           if (ndim>7) stop("can't handle arrays of dim>7")
-          secstr[i+1] = paste("init_",ndim,"array",
+          secstr[i+ind] = paste("init_",ndim,"array",
                   n," (",
                   paste(c(rbind(rep(1,ndim),dim(x))),
                         collapse=","),")",sep="")
         } ## multi-dim array
       } else stop("can only handle numeric values")
     } ## loop over R list
+    ## random effects vectors must come LAST
+    ind <- ind+length(R_list)
+    if (secname=="PARAMETER") {
+      if (!is.null(re_vectors)) {
+        nre <- length(re_vectors)
+        if (is.list(re_vectors)) re_vectors <- unlist(re_vectors)
+        secstr[(ind+1):(ind+nre)] <-
+          paste("random_effects_vector ",names(re_vectors),
+                "(1,",re_vectors,")",sep="")
+        ind <- ind+nre
+      }
+    }
+    secstr[-1] <- paste("  ",secstr[-1],sep="") ## indent all but first line
+    ## now write it
     fn2 <- paste(fn,".tpl",sep="")
     file.copy(fn2,
               paste(fn,".tpl.bak",sep=""))
@@ -220,7 +254,11 @@ read_pars <- function (fn) {
 
 do_admb = function(fn,
   data_list,param_list,
+  ## maybe specify some other way,
+  ##  e.g. as attributes on data_list?
+  param_bounds=NULL,
   re=FALSE,
+  re_vectors=NULL,
   safe=TRUE,
   mcmc=FALSE,
   mcmc2=FALSE,
@@ -232,15 +270,23 @@ do_admb = function(fn,
   wd=getwd(),
   checkparam=c("stop","warn","write","ignore"),
   checkdata=c("stop","warn","write","ignore"),
+  objfunname="f",
   clean=FALSE,
   extra.args) {
   ## TO DO: check to see if executables are found
   checkparam <- match.arg(checkparam)
   checkdata <- match.arg(checkdata)
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
-  if (!re && mcmc2) stop("mcmc2 only applies when re=TRUE")
+  if (!re) {
+    if (mcmc2) stop("mcmc2 only applies when re=TRUE")
+    if (!is.null(re_vectors)) stop("re_vectors should only be specified when re=TRUE")
+  } else {
+    if (checkparam=="write" && is.null(re_vectors)) {
+      stop("must specify random effects vectors")
+    }
+  }
   tplfile = paste(fn,"tpl",sep=".")
-  tplinfo <- read_tpl(fn)
+  tplinfo <- read_tpl(fn)  ## extract info from TPL file
   ofn <- fn
   if (!tolower(fn)==fn) {
     warning("base name converted to lower case for ADMB compatibility")
@@ -254,21 +300,36 @@ do_admb = function(fn,
   ## }
   if (!file.exists(tplfile))
     stop("could not find TPL file ",tplfile)
-  dmsg <- check_section(ofn,"data",data_list,
-                        check=checkdata,
-                        ## lower,upper,
-                        secname="PARAMETER")
-  if (nchar(dmsg)>0) {
-    if (checkdata=="stop") stop(dmsg)
-    if (checkdata=="warn") warning(dmsg)
+  if (!checkdata %in% c("write","ignore") && is.null(tplinfo$inits))
+    stop("must specify PARAMETER section (or set 'checkdata' to 'write' or 'ignore')")
+  if (checkdata=="write" && !is.null(tplinfo$inits)) {
+    stop("checkdata='write' but PARAMETER section already present in TPL file")
   }
   dmsg <- check_section(ofn,"inits",param_list,
                         check=checkparam,
-                        ## lower,upper,
-                        secname="")
+                        bounds=param_bounds,
+                        secname="PARAMETER",
+                        objfunname=objfunname,
+                        re_vectors=re_vectors)
   if (nchar(dmsg)>0) {
     if (checkparam=="stop") stop(dmsg)
     if (checkparam=="warn") warning(dmsg)
+  }
+  ## check DATA section **after** parameter section because
+  ## in the checkdata=='write' case it will get prepended,
+  ## and we need to have DATA_SECTION come first in the tpl file
+  if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
+    stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
+  if (checkdata=="write" && !is.null(tplinfo$data)) {
+    stop("checkdata='write' but DATA section already present in TPL file")
+  }
+  dmsg <- check_section(ofn,"data",data_list,
+                        check=checkdata,
+                        ## lower,upper,
+                        secname="DATA")
+  if (nchar(dmsg)>0) {
+    if (checkdata=="stop") stop(dmsg)
+    if (checkdata=="warn") warning(dmsg)
   }
   args = ""
   if (re) args = "-r"
@@ -614,6 +675,7 @@ drop_calcs <- function(s) {
 read_tpl <- function(f) {
   r <- readLines(paste(f,"tpl",sep="."))
   secStart <- which(substr(r,1,1) %in% LETTERS)
+  if (length(secStart)==0) stop("tpl file must contain at least one section (capitalized header)")
   if (secStart[1]!=1) { ## add first (comments etc.) section
     secStart <- c(1,secStart)
   }
@@ -627,10 +689,12 @@ read_tpl <- function(f) {
   ##  or something ...
   names(splsec) <- gsub("_.+","",sapply(splsec,"[",1))
   splsec_proc <- lapply(splsec,drop_calcs)
-  splsec_proc <- lapply(splsec_proc[c("PARAMETER","DATA")],proc_var)
+  L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
-  type <- 1 ## kluge for R CMD check warnings; will be masked
-  L1 <- with(pp,
+  if (!is.null(pp)) {
+      pp <- proc_var(pp)
+      type <- 1 ## kluge for R CMD check warnings; will be masked
+      L1 <- with(pp,
              list(inits=pp[grep("^init",type),],
                   raneff=pp[grep("^random",type),],
                   sdnums=pp[grep("^sdreport_number",type),],
@@ -641,10 +705,15 @@ read_tpl <- function(f) {
                   ## grep( "^ +sdreport_vector",splsec$PARAMETER,
                   ## value=TRUE)))
                   profparms=pp[grep("^likeprof",type),]))
+    }
   pp <- splsec_proc$DATA
-  L2 <- with(pp,
-             list(data=pp[grep("^init",type),]))
+  if (!is.null(pp)) {
+    pp <- proc_var(pp)
+    L2 <- with(pp,
+               list(data=pp[grep("^init",type),]))
+  }
   L <- c(L1,L2)
+  L <- L[!sapply(L,is.null)]
   L[sapply(L,nrow)>0]
 }
 
