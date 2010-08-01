@@ -1,12 +1,7 @@
 ## TO DO:
 ##   finish bounds/phase support
 ##    bounds checking?
-##   integrate writing/reading/checking
-##       if 'write', check if sections already exist:
-##         ignore? error?
-##    NEED TO BE ABLE TO APPEND TO EXISTING parameter sections
-##     CHANGE BEHAVIOR -- should be able to re-run the same
-##       code without errors the second time.  Copy to temporary file??
+##   careful with case of file names when writing -- change "ofn" to "fn" if writing?
 ##   check for variables with "." in the name: stop? change to "_" and warn?      
 ##   check for random effects vectors (don't redefine)
 ##   integrate sdreport stuff for MCMC
@@ -80,9 +75,9 @@ check_section <- function(fn,
       on.exit(detach(R_list),add=TRUE)
       ## now need to check dimensions etc...
       for (i in 1:nrow(info)) {
-        v = info[i,]
-        x = get(v$vname)
-        v$type = gsub("init_","",v$type)
+        v <- info[i,]
+        x <- get(v$vname)
+        v$type <- gsub("init_","",v$type)
         if (v$type %in% c("int","ivector","imatrix")) {
           if (any(trunc(x)!=x)) msg <- paste(msg,v$vname,
                      "non-integer;")
@@ -95,7 +90,7 @@ check_section <- function(fn,
           if (any(is.na(c(v$X1,v$X2)))) {
             msg <- paste(msg,"NAs in dimensions in ",v$vname)
           } else {
-            tpllen = eval(parse(text=paste(v$X2,"-",v$X1)))+1
+            tpllen <- eval(parse(text=paste(v$X2,"-",v$X1)))+1
             if (length(x)!=tpllen)
               msg <- paste(msg,"length mismatch in ",v$vname,
                            ": ",length(x)," (r) != ",tpllen," (tpl)",
@@ -103,7 +98,7 @@ check_section <- function(fn,
           }
         }
         if (v$type %in% c("imatrix","matrix")) { 
-          tpldim = with(v,c(
+          tpldim <- with(v,c(
             eval(parse(text=paste(v$X2,"-",v$X1)))+1,
             eval(parse(text=paste(v$X4,"-",v$X3)))+1))
           rdim <- dim(x)
@@ -118,8 +113,8 @@ check_section <- function(fn,
           } ## dimensions
         } ## if matrix
         if (length(grep(v$type,"array"))>0) {
-          arraydim = as.numeric(substr(v$type,1,1))
-          tpldim = numeric(arraydim)
+          arraydim <- as.numeric(substr(v$type,1,1))
+          tpldim <- numeric(arraydim)
           for (j in 1:arraydim) {
             tpldim[j] <-
               eval(parse(text=paste(v[2*j+2],"-",v[2*j+1])))+1
@@ -170,30 +165,35 @@ check_section <- function(fn,
       }
       if (is.int(x)) {
         if (length(x)==1 && is.null(dim(x))) {
-          parstr[i] = paste("init_int",n)
+          parstr[i] <- paste("init_int",n)
         } else if (length(x)>1 && is.null(dim(x))) {
-          parstr[i] = paste("init_ivector ",n," (1,",length(x),")",sep="")
+          parstr[i] <- paste("init_ivector ",n," (1,",length(x),")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          parstr[i] = paste("init_imatrix",n,
+          parstr[i] <- paste("init_imatrix",n,
                   " (1,",dim(x)[1],",1,",dim(x)[2],")")
         }
       } else if (storage.mode(x) %in% c("numeric","double")) {
         if (length(x)==1 && is.null(dim(x))) {
           if (!is.null(bounds) && n %in% names(bounds)) {
-            parstr[i] = paste("init_bounded_number ",n,
+            parstr[i] <- paste("init_bounded_number ",n,
                     "(",c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
           } else {
-            parstr[i] = paste("init_number",n)
+            parstr[i] <- paste("init_number",n)
           }
         } else if (length(x)>1 && is.null(dim(x))) {
-          parstr[i] = paste("init_vector ",n,"(1,",length(x),")",sep="")
+          if (!is.null(bounds) && n %in% names(bounds)) {
+            parstr[i] <- paste("init_bounded_vector ",n,
+                    "(1,",length(x),c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
+          } else {
+            parstr[i] <- paste("init_vector ",n,"(1,",length(x),")",sep="")
+          }
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          parstr[i] = paste("init_matrix ",n,
+          parstr[i] <- paste("init_matrix ",n,
                   "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
         } else if (!is.null(dim(x)) && length(dim(x))>2) {
           ndim <- length(dim(x))
           if (ndim>7) stop("can't handle arrays of dim>7")
-          parstr[i] = paste("init_",ndim,"array",
+          parstr[i] <- paste("init_",ndim,"array",
                   n," (",
                   paste(c(rbind(rep(1,ndim),dim(x))),
                         collapse=","),")",sep="")
@@ -203,7 +203,6 @@ check_section <- function(fn,
     parstr <- indent(parstr)
     cursec <- tpldat$secs[[secname]]
     if (!is.null(cursec)) {
-      browser()
       cursec <- cursec[-1] ## drop title
       cursec <- grep("^ *$",cursec,invert=TRUE,value=TRUE)  ## drop blank lines
     }
@@ -222,36 +221,50 @@ check_section <- function(fn,
 }
 
 read_pars <- function (fn) {
-  rt <- function(f,...) {
-    if (file.exists(f)) read.table(f,...) else NA
+  rt <- function(f,ext,...) {
+    if (file.exists(f)) read.table(paste(f,ext,sep="."),...) else NA
   }
-  par_dat = rt(paste(fn,"par",sep="."), skip = 1)
-  npar = nrow(par_dat)
-  sd_dat = rt(paste(fn,"std",sep="."), skip = 1,as.is=TRUE)
+  rs <- function(f,ext,...) {
+    if (file.exists(f)) scan(paste(f,ext,sep="."),comment.char="#",quiet=TRUE,...) else NA
+  }
+  par_dat <- rs(fn,"par", skip = 1)
+  npar <- length(par_dat)
+  sd_dat <- rt(fn,"std", skip = 1,as.is=TRUE)
   if (length(sd_dat)==1 && is.na(sd_dat)) return(NA)
   ## need col.names hack so read.table knows how many
   ##  columns to read: ?read.table, "Details"
-  ncorpar = length(readLines(paste(fn,"cor",sep=".")))-2
-  cor_dat = rt(paste(fn,"cor",sep="."), skip = 2, fill=TRUE, 
-    as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
+  ncorpar <- length(readLines(paste(fn,"cor",sep=".")))-2
+  cor_dat <- rt(fn,"cor", skip = 2, fill=TRUE, 
+                as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
   ## drop cors that are not parameters
   ## (have dropped mc parameters)
-  cormat = as.matrix(cor_dat[1:npar,4+(1:npar)])
-  cormat[upper.tri(cormat)] = t(cormat)[upper.tri(cormat)]
-  est = unlist(par_dat)
-  parnames = sd_dat[1:npar, 2]
-  std = sd_dat[1:npar, 4]
-  tmp = scan(paste(fn, ".par", sep = ""), what = "", quiet = TRUE)
-  loglik = as.numeric(tmp[11])
-  grad = as.numeric(tmp[16])
-  vcov = outer(std,std) * cormat 
-  names(est) = names(std) = rownames(vcov) = rownames(cormat) =
-    colnames(vcov) = colnames(cormat) = parnames
+  cormat <- as.matrix(cor_dat[1:npar,4+(1:npar)])
+  cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
+  est <- unlist(par_dat)
+  parnames <- sd_dat[1:npar, 2]
+  if (any(duplicated(parnames))) {
+    parnames <- unlist(lapply(split(parnames,factor(parnames)),
+                              function(x) {
+                                if (length(x)==1) x else {
+                                  paste(x,
+                                        ## format numbers equal width with leading zeros if necessary
+                                        formatC(seq_along(x),width=format.info(seq_along(x)),flag="0"),
+                                        sep="")
+                                }}))
+                                
+  }
+  std <- sd_dat[1:npar, 4]
+  tmp <- rs(fn, "par", what = "")
+  loglik <- as.numeric(tmp[11])
+  grad <- as.numeric(tmp[16])
+  vcov <- outer(std,std) * cormat 
+  names(est) <- names(std) <- rownames(vcov) <- rownames(cormat) <-
+    colnames(vcov) <- colnames(cormat) <- parnames
   if (!is.finite(loglik)) warning("bad log-likelihood: fitting problem in ADMB?")
   list(coefficients=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
 }
 
-do_admb = function(fn,
+do_admb <- function(fn,
   data_list,param_list,
   ## maybe specify some other way,
   ##  e.g. as attributes on data_list?
@@ -284,13 +297,14 @@ do_admb = function(fn,
       stop("must specify random effects vectors")
     }
   }
-  tplfile = paste(fn,"tpl",sep=".")
+  tplfile <- paste(fn,"tpl",sep=".")
   tpldat <- read_tpl(fn)  ## extract info from TPL file
   tplinfo <- tpldat$info
   ofn <- fn
   if (!tolower(fn)==fn) {
     warning("base name converted to lower case for ADMB compatibility")
     fn <- tolower(fn)
+    file.copy(ofn,fn)
   }
   ## require(glmmADMB)
   ## if (!re) {
@@ -345,17 +359,17 @@ do_admb = function(fn,
     fn2 <- paste(fn,".tpl",sep="")
     fn2gen <- paste(fn,"_gen.tpl",sep="")
     fn2bak<- paste(fn,".tpl.bak",sep="")
-    file.copy(fn2,fn2bak)
+    file.copy(fn2,fn2bak,overwrite=TRUE)
     ## on exit, copy auto-generated file and restore original ...
     on.exit(file.copy(fn2,fn2gen,overwrite=TRUE),add=TRUE)
     on.exit(file.copy(fn2bak,fn2,overwrite=TRUE),add=TRUE)
     writeLines(do.call("c",tpldat$secs),con=fn2)
   }
-  args = ""
-  if (re) args = "-r"
-  if (safe) args = paste(args,"-s")
+  args <- ""
+  if (re) args <- "-r"
+  if (safe) args <- paste(args,"-s")
   if (verbose) cat("compiling with args: '",args,"' ...\n")
-  res0 = system(paste("admb",args,ofn," 2>",paste(fn,".cout",sep="")),
+  res0 <- system(paste("admb",args,fn," 2>",paste(fn,".cout",sep="")),
     intern=TRUE)
   coutfile <- readLines(paste(fn,".cout",sep=""))
   if (verbose) {
@@ -375,18 +389,23 @@ do_admb = function(fn,
   ## check order of data; length of vectors???
   dat_write(fn,data_list)
   ## check order of parameters ??
+  ## add random effects to list of initial parameters
+  if (re) {
+    rv <- re_vectors[!names(re_vectors) %in% names(param_list)]
+    param_list <- c(param_list,lapply(as.list(re_vectors),rep,x=0))
+  }
   pin_write(fn,param_list)
   args <- ""
   if (mcmc) {
-    args = paste(args,"-mcmc",mcmcsteps)
+    args <- paste(args,"-mcmc",mcmcsteps)
     if (mcmcsave>0)
-      args = paste(args,"-mcsave",mcmcsave)
+      args <- paste(args,"-mcsave",mcmcsave)
   }
   if (!missing(extra.args)) {
     args <- paste(args,extra.args)
   }
   if (verbose) cat("running compiled executable with args: '",args,"'...\n")
-  res = system(paste("./",ofn,args," 2>",fn,".out",sep=""),intern=TRUE)
+  res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
   outfile <- readLines(paste(fn,".out",sep=""))
   ## replace empty res with <empty> ?
   if (verbose) {
@@ -396,13 +415,13 @@ do_admb = function(fn,
   if (length(grep("^Error",outfile)>0))
     stop("errors detected in run: run with verbose=TRUE to view")
   if (verbose) cat("reading output ...\n")
-  L = c(list(fn=fn,txt=res),read_pars(fn))
+  L <- c(list(fn=fn,txt=res),read_pars(fn))
   if (mcmc) {
-    L = c(L,list(hist=read_hst(fn),
+    L <- c(L,list(hist=read_hst(fn),
       mcmc=read_psv(ofn)))
   }
   ## check for NA/NaN in logLik, errors in text?
-  class(L) = "admb"
+  class(L) <- "admb"
   if (isTRUE(clean)) clean <- "all"
   if (is.character(clean)) {
     ## cover both cases
@@ -492,20 +511,20 @@ clean_admb <- function(fn,which=c("all","sys","output")) {
 ## @rm -vf admodel{.cov,.dep,.hes} eigv.rpt fmin.log variance hess*
 
 read_chunk <- function(fn,sep="^#",maxlines=1000) {
-  end = FALSE
-  ans = character(maxlines)
-  i = 1
+  end <- FALSE
+  ans <- character(maxlines)
+  i <- 1
   has_sep <- function(x) length(grep(sep,x))>0
   while (!end) {
-    tmp = readLines(fn,n=1)
+    tmp <- readLines(fn,n=1)
     if (i>1 && has_sep(tmp)) {
       end=TRUE
       pushBack(tmp,fn)
     } else if (length(tmp)==0) {
       end=TRUE
     } else {
-      ans[i] = tmp
-      i = i+1
+      ans[i] <- tmp
+      i <- i+1
     }
   }
   ans[1:(i-1)]
@@ -608,7 +627,7 @@ plot.admb_hist <- function(x,type=c("lattice","ggplot"),
 
 
 ## from Steve Martell
-reptoRlist = function(fn) {
+reptoRlist <- function(fn) {
   ifile=scan(fn,what="character",flush=TRUE,blank.lines.skip=FALSE,quiet=TRUE)
   idx=sapply(as.double(ifile),is.na)
   vnam=ifile[idx] #list names
@@ -619,7 +638,7 @@ reptoRlist = function(fn) {
     ir=match(vnam[i],ifile)
     if(i!=nv) irr=match(vnam[i+1],ifile) else irr=length(ifile)+1 #next row
     dum=NA
-    if(irr-ir==2) dum=as.double(scan(fn,skip=ir,nlines=1,quiet=T,what=""))
+    if(irr-ir==2) dum=as.double(scan(fn,skip=ir,nlines=1,quiet=TRUE,what=""))
     if(irr-ir>2) dum=as.matrix(read.table(fn,skip=ir,nrow=irr-ir-1,fill=T))
     if(is.numeric(dum))#Logical test to ensure dealing with numbers
       {
@@ -632,7 +651,7 @@ reptoRlist = function(fn) {
 if (FALSE) {
   readBin("mccoypred6.b01","double",n=11)
   scan("mccoypred6.p01",comment="#")
-  zz = matrix(readBin("mccoypred6.mcm","double",n=6000),
+  zz <- matrix(readBin("mccoypred6.mcm","double",n=6000),
     byrow=TRUE,ncol=6)
   zz <- as.data.frame(zz)
   names(zz) <- c("c","d","h","g","sigma_c","xx")
@@ -755,7 +774,7 @@ read_psv <- function(f) {
 ##  standard format is: 1 integer describing number
 ##  of (double) values per vector
 read_admbbin <- function(fn) {
-  f = file(fn,open="rb")
+  f <- file(fn,open="rb")
   nv <- readBin(f,"int")
   fs <- file.info(fn)$size
   isize <- 4; dsize <- 8
@@ -768,14 +787,14 @@ read_admbbin <- function(fn) {
 "dat_write" <-
 function (name, L) 
 {
-    n = nchar(name)
+    n <- nchar(name)
     if (substring(name, n - 3, n) == ".dat") {
       file_name <- name
     } else file_name <- paste(name, "dat", sep = ".")
     cat("# \"", file_name,"\" produced by dat_write() from R2admb ", 
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
-        x = L[[i]]
+        x <- L[[i]]
         if (data.class(x) == "numeric") 
             cat("#", names(L)[i], "\n", L[[i]], "\n\n", file = file_name, 
                 append = TRUE)
@@ -792,14 +811,14 @@ function (name, L)
 "pin_write" <-
 function (name, L) 
 {
-    n = nchar(name)
+    n <- nchar(name)
     if (substring(name, n - 3, n) == ".pin") 
-        file_name = name
-    else file_name = paste(name, ".pin", sep = "")
+        file_name <- name
+    else file_name <- paste(name, ".pin", sep = "")
     cat("# \"", name, ".pin\" produced by pin_write() from R2admb ", 
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
-        x = L[[i]]
+        x <- L[[i]]
         if (data.class(x) == "numeric") 
             cat("#", names(L)[i], "\n", L[[i]], "\n\n", file = file_name, 
                 append = TRUE)
@@ -815,11 +834,11 @@ function (name, L)
 
 if (FALSE) {
   ## test: can we read all ADMB examples without crashing?
-  dir = "/usr/local/src/admb/examples/admb/"
-  dir = "/usr/local/src/admb/examples/admb-re/"
+  dir <- "/usr/local/src/admb/examples/admb/"
+  dir <- "/usr/local/src/admb/examples/admb-re/"
   setwd(dir)
   ## omit files with '.' (happen to be non-directories)
-  L = list.files(pattern="^[a-zA-Z_]+$")
+  L <- list.files(pattern="^[a-zA-Z_]+$")
   source("/home/ben/lib/R/pkgs/r2admb/pkg/R/admb-funs.R")
   for (i in seq_along(L)) {
     setwd(file.path(dir,L[i]))
