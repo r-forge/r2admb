@@ -8,6 +8,10 @@
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
 
+  indent <- function(str,n=2) {
+    paste(paste(rep(" ",n),collapse=""),str,sep="")
+  }
+
 setup_admb <- function(admb_home) {
   ## check whether already set up
   sys_home <- Sys.getenv("ADMB_HOME")
@@ -52,12 +56,10 @@ check_section <- function(fn,
                           bounds,
                           phase,
                           re_vectors,
+                          mcmcpars,
                           secname,
                           objfunname="f",
                           intcheck=c("strict","sloppy")) {
-  indent <- function(str,n=2) {
-    paste(paste(rep(" ",n),collapse=""),str,sep="")
-  }
   intcheck <- match.arg(intcheck)
   Rnames  <- names(R_list)
   msg <- ""
@@ -142,17 +144,30 @@ check_section <- function(fn,
     ## phases: list OR (named) vector or n-vector
     ## arrays must be 1-based: if you want zero-based arrays
     ##     then write the TPL section yourself
-    if (!missing(bounds) || !missing(phase))
-      warning("bounds and phase support incomplete")
+    if (!missing(phase))
+      stop("phase support not yet implemented")
     ## no existing section: need title line
     sectitle <- paste(secname,"_SECTION",sep="")
     nvals <- length(R_list)
     objstr <- NULL
-    if (secname=="PARAMETER") {
+    pars <- (secname=="PARAMETER")  ## only check bounds for parameters
+    if (pars) {
       if (is.null(objfunname)) stop("must specify a name for the objective function")
       objstr <- indent(paste("objective_function_value",objfunname))
     }
     parstr <- character(nvals)
+    ## FIXME: parameter tables should be more standardized --
+    ## room for all possible dimensions, bounds, phase?
+    partab <- data.frame(type=character(nvals),
+                         vname=names(R_list),
+                         dim1=rep(NA,nvals),
+                         dim2=rep(NA,nvals),
+                         dim3=rep(NA,nvals),
+                         dim4=rep(NA,nvals),
+                         lower=rep(NA,nvals),
+                         upper=rep(NA,nvals),
+                         phase=rep(NA,nvals),
+                         stringsAsFactors=FALSE)
     for (i in 1:length(R_list)) {
       x <- R_list[[i]]
       n <- names(R_list)[i]
@@ -166,30 +181,41 @@ check_section <- function(fn,
       if (is.int(x)) {
         if (length(x)==1 && is.null(dim(x))) {
           parstr[i] <- paste("init_int",n)
+          partab$type[i] <- "int"
         } else if (length(x)>1 && is.null(dim(x))) {
           parstr[i] <- paste("init_ivector ",n," (1,",length(x),")",sep="")
+          partab$type[i] <- "ivector"
+          partab$dim1 <- length(x)
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
           parstr[i] <- paste("init_imatrix",n,
                   " (1,",dim(x)[1],",1,",dim(x)[2],")")
+          partab$dim1 <- dim(x)[1]
+          partab$dim2 <- dim(x)[2]
         }
       } else if (storage.mode(x) %in% c("numeric","double")) {
         if (length(x)==1 && is.null(dim(x))) {
-          if (!is.null(bounds) && n %in% names(bounds)) {
+          if (pars && !is.null(bounds) && n %in% names(bounds)) {
             parstr[i] <- paste("init_bounded_number ",n,
-                    "(",c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
+                               "(",bounds[[n]][1],",",bounds[[n]][2],")",sep="")
           } else {
-            parstr[i] <- paste("init_number",n)
+            parstr[i] <- paste("init_number",n)           
           }
+          partab$type[i] <- "number"
         } else if (length(x)>1 && is.null(dim(x))) {
-          if (!is.null(bounds) && n %in% names(bounds)) {
+          if (pars && !is.null(bounds) && n %in% names(bounds)) {
             parstr[i] <- paste("init_bounded_vector ",n,
-                    "(1,",length(x),c(bounds[[n]][1],",",bounds[[n]][2]),")",sep="")
+                    "(1,",length(x),bounds[[n]][1],",",bounds[[n]][2],")",sep="")
           } else {
             parstr[i] <- paste("init_vector ",n,"(1,",length(x),")",sep="")
           }
+          partab$type[i] <- "vector"
+          partab$dim1[i] <- length(x)
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
           parstr[i] <- paste("init_matrix ",n,
                   "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
+          partab$type[i] <- "matrix"
+          partab$dim1 <- dim(x)[1]
+          partab$dim2 <- dim(x)[2]
         } else if (!is.null(dim(x)) && length(dim(x))>2) {
           ndim <- length(dim(x))
           if (ndim>7) stop("can't handle arrays of dim>7")
@@ -197,6 +223,9 @@ check_section <- function(fn,
                   n," (",
                   paste(c(rbind(rep(1,ndim),dim(x))),
                         collapse=","),")",sep="")
+          partab$type[i] <- "array"
+          ## FIXME: store array dimensions?
+          if (!is.null(mcmcpars)) stop("arrays currently incompatible with MCMC")
         } ## multi-dim array
       } else stop("can only handle numeric values")
     } ## loop over R list
@@ -206,8 +235,9 @@ check_section <- function(fn,
       cursec <- cursec[-1] ## drop title
       cursec <- grep("^ *$",cursec,invert=TRUE,value=TRUE)  ## drop blank lines
     }
-    restr <- NULL
-    if (secname=="PARAMETER") {
+    restr <- mcmcstr <- NULL
+    if (pars) {
+      ## deal with random effects vectors
       if (!is.null(re_vectors)) {
         nre <- length(re_vectors)
         restr <- character(nre)
@@ -215,8 +245,37 @@ check_section <- function(fn,
         restr <- indent(paste("random_effects_vector ",names(re_vectors),
                 "(1,",re_vectors,")",sep=""))
       }
+      if(!is.null(mcmcpars)) {
+        ## find names
+        ## paste("(",apply(z,1,function(x) paste(na.omit(x),collapse=",")))
+        tt <- tpldat$info$other
+        allnames <- c(partab$vname,tt$vname)
+        bad <- which(!mcmcpars %in% allnames)
+        if (length(bad)>0) {
+          stop("some mcmcpars not found in parameter table:",paste(mcmcpars[bad],collapse=", "))
+        }
+        ## FIXME: uuuuuugly! need a better, more consistent way of handling parameter attributes ...
+        mcmcstr <- sapply(mcmcpars,function(z) {
+          if (z %in% partab$vname) {
+            i <- match(z,partab$vname)
+            type <- partab$type[i]
+            name <- partab$vname[i]
+            dimvals <- na.omit(unlist(partab[i,c("dim1","dim2","dim3","dim4")]))
+            dimvals <- c(rbind(rep(1,length(dimvals)),dimvals))
+          } else if (z %in% tt$vname) {
+            i <- match(z,tt$vname)
+            type <- tt$type[i]
+            name <- tt$vname[i]
+            dimvals <- na.omit(unlist(tt[i,3:7]))
+          }
+          indent(paste("sdreport_",type," r_",name,
+                       if (length(dimvals)==0) "" else
+                       paste("(",paste(dimvals,collapse=","),")",sep=""),
+                       sep=""))
+        })
+      }
     }
-    return(c(sectitle,"",objstr,parstr,cursec,restr))
+    return(c(sectitle,"",objstr,parstr,cursec,restr,mcmcstr))
   }
 }
 
@@ -265,30 +324,31 @@ read_pars <- function (fn) {
 }
 
 do_admb <- function(fn,
-  data_list,param_list,
-  ## maybe specify some other way,
-  ##  e.g. as attributes on data_list?
-  param_bounds=NULL,
-  re=FALSE,
-  re_vectors=NULL,
-  safe=TRUE,
-  mcmc=FALSE,
-  mcmc2=FALSE,
-  mcmcsteps=1000,
-  mcmcsave=round(mcmcsteps/1000),
-  mcmcpars,
-  impsamp=FALSE,
-  verbose=FALSE,
-  wd=getwd(),
-  checkparam=c("stop","warn","write","ignore"),
-  checkdata=c("stop","warn","write","ignore"),
-  objfunname="f",
-  clean=FALSE,
-  extra.args) {
+                    data_list,param_list,
+                    param_bounds=NULL, ## maybe specify some other way, e.g. as attributes on data_list?
+                    ## FIXME: allow phases?
+                    re=FALSE,
+                    re_vectors=NULL,
+                    safe=TRUE,
+                    mcmc=FALSE,
+                    mcmc2=FALSE,
+                    mcmcsteps=1000,
+                    mcmcsave=round(mcmcsteps/1000),
+                    mcmcpars=NULL,
+                    impsamp=FALSE,
+                    verbose=FALSE,
+                    wd=getwd(),
+                    checkparam=c("stop","warn","write","ignore"),
+                    checkdata=c("stop","warn","write","ignore"),
+                    objfunname="f",
+                    clean=FALSE,
+                    extra.args) {
   ## TO DO: check to see if executables are found
   checkparam <- match.arg(checkparam)
   checkdata <- match.arg(checkdata)
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
+  if (mcmc && missing(mcmcpars) && checkparam=="write") stop("must specify mcmcpars when checkparam=='write' and mcmc is TRUE")
+  if (!mcmc && !missing(mcmcpars)) stop("mcmcpars specified but mcmc is FALSE")
   if (!re) {
     if (mcmc2) stop("mcmc2 only applies when re=TRUE")
     if (!is.null(re_vectors)) stop("re_vectors should only be specified when re=TRUE")
@@ -322,7 +382,8 @@ do_admb <- function(fn,
                         bounds=param_bounds,
                         secname="PARAMETER",
                         objfunname=objfunname,
-                        re_vectors=re_vectors)
+                        re_vectors=re_vectors,
+                        mcmcpars=mcmcpars)
   if (!checkparam %in% c("write","ignore") && nchar(dmsg)>0) {
     if (checkparam=="stop") stop(dmsg)
     if (checkparam=="warn") warning(dmsg)
@@ -334,6 +395,14 @@ do_admb <- function(fn,
       tpldat$secs <- append(tpldat$secs,list(PARAMETER=c(dmsg,"")),
                             after=which(names(tpldat$secs)=="PROCEDURE")-1)
     }
+    if (mcmc) {
+      ## need to assign MCMC reporting variables
+      mcmcparnames <- gsub("^ +sdreport_(number|vector) r_","",
+                           dmsg[grep("^ +sdreport",dmsg)])
+      tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
+                                      indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
+    }
+
   }
   ## check DATA section
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
@@ -680,7 +749,7 @@ strip_comments <- function(s) {
   gsub("[ \\\t]*//.*$","",s)
 }
 
-proc_var <- function(s,drop.first=TRUE) {
+proc_var <- function(s,drop.first=TRUE,maxlen) {
   if (drop.first) s <- s[-1]
   ## strip comments & whitespace
   s2 <- gsub("^ *","",gsub("[;]*[ \\\t]*$","",strip_comments(s)))
@@ -690,7 +759,9 @@ proc_var <- function(s,drop.first=TRUE) {
   rest <- sapply(words,"[[",2)
   rest2 <- strsplit(gsub("[(),]"," ",rest)," ")
   vname <- sapply(rest2,"[[",1)
-  maxlen <- max(sapply(rest2,length))
+  maxlen0 <- max(sapply(rest2,length))
+  if (missing(maxlen)) maxlen <- maxlen0
+  else maxlen <- pmax(maxlen,maxlen0)
   opts <- t(sapply(rest2,
            function(w) {
              ## as.numeric()?
@@ -732,13 +803,14 @@ read_tpl <- function(f) {
   L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
   if (!is.null(pp)) {
-      pp <- proc_var(pp)
+      pp <- proc_var(pp,maxlen=7)
       type <- 1 ## kluge for R CMD check warnings; will be masked
       L1 <- with(pp,
              list(inits=pp[grep("^init",type),],
                   raneff=pp[grep("^random",type),],
                   sdnums=pp[grep("^sdreport_number",type),],
                   sdvecs=pp[grep("^sdreport_vector",type),],
+                  other=pp[grep("^init|random|sdreport",type,invert=TRUE),],
                   ## FIXME: don't know what I needed this for
                   ## sdvecdims <- gsub("^ +sdreport_vector[ a-zA-Z]+","",
                   ## gsub("[()]","",
@@ -748,7 +820,7 @@ read_tpl <- function(f) {
     }
   pp <- splsec_proc$DATA
   if (!is.null(pp)) {
-    pp <- proc_var(pp)
+    pp <- proc_var(pp,maxlen=7)
     L2 <- with(pp,
                list(data=pp[grep("^init",type),]))
   }
