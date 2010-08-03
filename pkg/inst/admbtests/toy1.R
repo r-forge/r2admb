@@ -20,8 +20,10 @@ d1 <- do_admb("toy1",
               checkdata="write",checkparam="write",
               mcmc=TRUE,
               mcmcpars=c("beta","sigma_herd"),
-              mcmcsteps=20)
+              mcmcsteps=20,
+              clean=TRUE)
 
+unlink(c("toy1","toy1_gen.tpl"))
 
 ## plot(ranef(gm1)$herd[[1]],coef(toyfit1)[-(1:5)]*coef(toyfit1)["sigma_herd"])
 ## abline(a=0,b=1)
