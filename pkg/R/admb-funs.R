@@ -602,17 +602,20 @@ AIC.admb <- function(object,...,k=2) {
 clean_admb <- function(fn,which=c("all","sys","output")) {
   tplfile <- paste(fn,"tpl",sep=".")
   ## need logic here!  enumeration of all files ???
-  sys.ext <- c("htp","cpp","o","rep","rhes","bar","eva")
+  sys.ext <- c("htp","cpp","o","rep","rhes","bar","eva",
+               "bgs","ecm","luu","mc2","mcm","tpl.bak")
   input.ext <- c("pin","dat")
-  output.ext <- c("log","cor","std", "par")
+  output.ext <- c("log","cor","std", "par","psv","hst")
   sys2.ext <- c("out","cout")
   other <- c("eigv.rpt","fmin.log","variance","sims",
-             "hesscheck","hesscheck.bin",
+             "hesscheck","hessian.bin",
              paste("admodel",c("dep","hes","cov"),sep="."))
   which <- match.arg(which)
   if (which=="all") {
-    delfiles <- list.files(pattern=paste("^",fn,"\\..*",sep=""))
-    delfiles <- setdiff(delfiles,tplfile)
+    ## erase only targeted extensions -- NOT everything with the basename except the tpl file
+    delfiles <-  paste(fn,c(sys.ext,input.ext,output.ext,sys2.ext),sep=".")
+    ## list.files(pattern=paste("^",fn,"\\..*",sep=""))
+    ##    delfiles <- setdiff(delfiles,tplfile)
     delfiles <- c(delfiles,other)
   } else {
     stop("only 'all' option is currently implemented")
