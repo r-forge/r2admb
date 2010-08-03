@@ -89,6 +89,7 @@ check_section <- function(fn,
       for (i in 1:nrow(info)) {
         v <- info[i,]
         ## x <- get(v$vname)
+        ##  i.e. search only in data, not everywhere ...
         x <- R_list[[v$vname]]
         v$type <- gsub("init_","",v$type)
         if (v$type %in% c("int","ivector","imatrix")) {
@@ -373,7 +374,7 @@ do_admb <- function(fn,
   if (!tolower(fn)==fn) {
     warning("base name converted to lower case for ADMB compatibility")
     fn <- tolower(fn)
-    file.copy(ofn,fn)
+    file.copy(ofn,fn,overwrite=TRUE)
   }
   ## require(glmmADMB)
   ## if (!re) {
