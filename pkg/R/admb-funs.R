@@ -6,7 +6,9 @@
 ##   check for random effects vectors (don't redefine if already there)
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
-## cleanup: eigv.rpt, fmin.log, variance, .ecm are leftover
+##   copying strategy when checkdata/checkparam=="write" is dangerous/fragile --
+##     gets screwed up if one tries to run the same file in more than one
+##     session.  Use temporary files/directories to sort this out?
 
 indent <- function(str,n=2) {
   paste(paste(rep(" ",n),collapse=""),str,sep="")
