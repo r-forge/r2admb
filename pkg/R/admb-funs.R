@@ -8,9 +8,15 @@
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
 
-  indent <- function(str,n=2) {
-    paste(paste(rep(" ",n),collapse=""),str,sep="")
-  }
+indent <- function(str,n=2) {
+  paste(paste(rep(" ",n),collapse=""),str,sep="")
+}
+
+## format numbers equal width with leading zeros if necessary
+numfmt <- function(x,len=length(x)) {
+  paste(x,
+        formatC(seq(len),width=format.info(seq(len)),flag="0"),
+        sep="") }
 
 setup_admb <- function(admb_home) {
   ## check whether already set up
@@ -304,13 +310,8 @@ read_pars <- function (fn) {
   if (any(duplicated(parnames))) {
     parnames <- unlist(lapply(split(parnames,factor(parnames)),
                               function(x) {
-                                if (length(x)==1) x else {
-                                  paste(x,
-                                        ## format numbers equal width with leading zeros if necessary
-                                        formatC(seq_along(x),width=format.info(seq_along(x)),flag="0"),
-                                        sep="")
-                                }}))
-                                
+                                if (length(x)==1) x else numfmt(x)
+                              }))
   }
   std <- sd_dat[1:npar, 4]
   tmp <- rs(fn, "par", what = "")
@@ -433,6 +434,7 @@ do_admb <- function(fn,
     on.exit(file.copy(fn2,fn2gen,overwrite=TRUE),add=TRUE)
     on.exit(file.copy(fn2bak,fn2,overwrite=TRUE),add=TRUE)
     writeLines(do.call("c",tpldat$secs),con=fn2)
+    tpldat <- read_tpl(paste(fn,"_gen",sep=""))
   }
   args <- ""
   if (re) args <- "-r"
@@ -486,8 +488,15 @@ do_admb <- function(fn,
   if (verbose) cat("reading output ...\n")
   L <- c(list(fn=fn,txt=res),read_pars(fn))
   if (mcmc) {
+    if (checkparam!="write") {
+      warning("MCMC naming is probably wrong")
+    }
+    pnames <- get_names(c(mcmcpars,names(re_vectors)),
+                        tpldat$info)
     L <- c(L,list(hist=read_hst(fn),
-      mcmc=read_psv(ofn)))
+                  mcmc=read_psv(ofn,names=pnames)))
+    ## FIXME: if TPL file is user-written we need to recover
+    ## the *order* of mcmc pars somehow?
   }
   ## check for NA/NaN in logLik, errors in text?
   class(L) <- "admb"
@@ -498,6 +507,28 @@ do_admb <- function(fn,
     clean_admb(fn,clean)
   }
   L
+}
+
+str_contains <- function(x,y) {
+  length(grep(x,y)>1)
+}
+get_names <- function(pars,info) {
+  unlist(sapply(pars,
+         function(p) {
+           if (p %in% info$inits$vname) {
+             i <- match(p,info$inits$vname)
+             tt <- info$inits$type[i]
+             if (str_contains("number$",tt)) {
+               p
+             } else if (str_contains("vector$",tt)) {
+               numfmt(p,as.numeric(info$inits$X2[i]))
+               ## FIXME: may fail if this value needs to be parsed?
+             } else stop("can't handle matrix names yet")
+           } else if (p %in% info$raneff$vname) {
+             i <- match(p,info$raneff$vname)
+             numfmt(p,as.numeric(info$raneff$X2[i]))
+           }
+         }))
 }
 
 print.admb <- function(x, verbose=FALSE, ...) {
@@ -829,15 +860,12 @@ read_tpl <- function(f) {
   list(secs=splsec,info=L[sapply(L,nrow)>0])
 }
 
-read_psv <- function(f) {
-  tpl <- read_tpl(f)$info
+read_psv <- function(f,names=NULL) {
   f <- tolower(f) ## argh
   fn <- paste(f,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
   ans <- read_admbbin(fn)
-  nnums <- nrow(tpl$sdnums)
-  colnames(ans) <- c(tpl$sdnums$vname,rep("",ncol(ans)-nnums))
-  ## assume parameters come before random effects?
+  colnames(ans) <- names
   ans <- as.data.frame(ans)
   ans
 }
