@@ -340,7 +340,7 @@ do_admb <- function(fn,
                     mcmc=FALSE,
                     mcmc2=FALSE,
                     mcmcsteps=1000,
-                    mcmcsave=round(mcmcsteps/1000),
+                    mcmcsave=max(1,round(mcmcsteps/1000)),
                     mcmcpars=NULL,
                     impsamp=FALSE,
                     verbose=FALSE,
@@ -405,7 +405,8 @@ do_admb <- function(fn,
     if (mcmc) {
       ## need to assign MCMC reporting variables
       mcmcparnames <- gsub("^ +sdreport_(number|vector) r_","",
-                           dmsg[grep("^ +sdreport",dmsg)])
+                           gsub("\\(.*$","",
+                                dmsg[grep("^ +sdreport",dmsg)]))
       tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
                                       indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
     }
@@ -499,8 +500,10 @@ do_admb <- function(fn,
     }
     pnames <- get_names(c(mcmcpars,names(re_vectors)),
                         tpldat$info)
-    L <- c(L,list(hist=read_hst(fn),
-                  mcmc=read_psv(ofn,names=pnames)))
+    L <- c(L,list(hist=read_hst(fn)))
+    if (mcmcsave>0) {
+      L <- c(L,list(mcmc=read_psv(ofn,names=pnames)))
+    }
     ## FIXME: if TPL file is user-written we need to recover
     ## the *order* of mcmc pars somehow?
   }
