@@ -32,7 +32,9 @@ setup_admb <- function(admb_home) {
         ## unix.  Should (1) check that locate really exists,
         ## (2) check that it finds something, (3) try to
         ## use 'default' location??
-        admb_home <- gsub("bin/admb","",system("locate bin/admb | grep bin/admb$",intern=TRUE))
+        admb_home <- gsub("/bin/admb","",system("locate bin/admb | grep bin/admb$",intern=TRUE))
+        ## n.b. extra slash at end of ADMB_HOME is **VERY BAD** **VERY CONFUSING**
+        ##  provokes weird behavior where "bin/sedd..." turns into "binsedd..." ???
         if (length(admb_home)>1) {
           warning("'locate' found more than one instance of bin/admb: using last")
           ## FIXME: query user?
@@ -84,7 +86,8 @@ check_section <- function(fn,
       ## now need to check dimensions etc...
       for (i in 1:nrow(info)) {
         v <- info[i,]
-        x <- get(v$vname)
+        ## x <- get(v$vname)
+        x <- R_list[[v$vname]]
         v$type <- gsub("init_","",v$type)
         if (v$type %in% c("int","ivector","imatrix")) {
           if (any(trunc(x)!=x)) msg <- paste(msg,v$vname,
@@ -598,6 +601,7 @@ clean_admb <- function(fn,which=c("all","sys","output")) {
   output.ext <- c("log","cor","std", "par")
   sys2.ext <- c("out","cout")
   other <- c("eigv.rpt","fmin.log","variance","sims",
+             "hesscheck","hesscheck.bin",
              paste("admodel",c("dep","hes","cov"),sep="."))
   which <- match.arg(which)
   if (which=="all") {
