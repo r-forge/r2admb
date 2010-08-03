@@ -7,8 +7,9 @@
   Compile an ADMB model, run it, collect output
 }
 \usage{
-do_admb(fn, data_list, param_list,
-param_bounds,
+do_admb(fn, data, params,
+bounds=NULL,
+phase=NULL,
 re = FALSE,
 re_vectors = NULL,
 safe = TRUE,
@@ -29,13 +30,14 @@ extra.args)
 \arguments{
   \item{fn}{(character) base name of a TPL function,
     located in the working directory}
-  \item{data_list}{
+  \item{data}{
     a list of input data variables
     (order must match TPL file)}
-  \item{param_list}{a list of starting parameter values
+  \item{params}{a list of starting parameter values
     (order must match TPL file)}
-  \item{param_bounds}{named list of 2-element vectors of lower and upper
+  \item{bounds}{named list of 2-element vectors of lower and upper
     bounds for specified parameters}
+  \item{phase}{named numeric vector of phases (not implemented yet)}
   \item{re}{(logical) use random effects?}
   \item{re_vectors}{a named numeric vector of the identities and lengths
     of any random effects vectors used in the TPL file}

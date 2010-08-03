@@ -3,10 +3,10 @@
 ##    bounds checking?
 ##   careful with case of file names when writing -- change "ofn" to "fn" if writing?
 ##   check for variables with "." in the name: stop? change to "_" and warn?      
-##   check for random effects vectors (don't redefine)
-##   integrate sdreport stuff for MCMC
+##   check for random effects vectors (don't redefine if already there)
 ##   parameter/data order checking?
 ##   more checks/flags of compiling step -- stop if error
+## cleanup: eigv.rpt, fmin.log, variance, .ecm are leftover
 
 indent <- function(str,n=2) {
   paste(paste(rep(" ",n),collapse=""),str,sep="")
@@ -32,7 +32,7 @@ setup_admb <- function(admb_home) {
         ## unix.  Should (1) check that locate really exists,
         ## (2) check that it finds something, (3) try to
         ## use 'default' location??
-        admb_home <- gsub("bin/admb","",system("locate bin/admb",intern=TRUE))
+        admb_home <- gsub("bin/admb","",system("locate bin/admb | grep bin/admb$",intern=TRUE))
         if (length(admb_home)>1) {
           warning("'locate' found more than one instance of bin/admb: using last")
           ## FIXME: query user?
@@ -289,8 +289,9 @@ read_pars <- function (fn) {
   rt <- function(f,ext,...) {
     if (file.exists(f)) read.table(paste(f,ext,sep="."),...) else NA
   }
-  rs <- function(f,ext,...) {
-    if (file.exists(f)) scan(paste(f,ext,sep="."),comment.char="#",quiet=TRUE,...) else NA
+  rs <- function(f,ext,comment.char="#",...) {
+    if (file.exists(f)) scan(paste(f,ext,sep="."),
+                             comment.char=comment.char,quiet=TRUE,...) else NA
   }
   par_dat <- rs(fn,"par", skip = 1)
   npar <- length(par_dat)
@@ -314,7 +315,7 @@ read_pars <- function (fn) {
                               }))
   }
   std <- sd_dat[1:npar, 4]
-  tmp <- rs(fn, "par", what = "")
+  tmp <- rs(fn, "par", what = "", comment.char="")
   loglik <- as.numeric(tmp[11])
   grad <- as.numeric(tmp[16])
   vcov <- outer(std,std) * cormat 
@@ -325,8 +326,10 @@ read_pars <- function (fn) {
 }
 
 do_admb <- function(fn,
-                    data_list,param_list,
-                    param_bounds=NULL, ## maybe specify some other way, e.g. as attributes on data_list?
+                    data,
+                    params,
+                    bounds=NULL, ## maybe specify some other way, e.g. as attributes on data?
+                    phase=NULL,
                     ## FIXME: allow phases?
                     re=FALSE,
                     re_vectors=NULL,
@@ -378,9 +381,9 @@ do_admb <- function(fn,
   ### check PARAMETER section
   if (!checkparam %in% c("write","ignore") && is.null(tplinfo$inits))
     stop("must specify PARAMETER section (or set 'checkparam' to 'write' or 'ignore')")
-  dmsg <- check_section(ofn,tpldat,"inits",param_list,
+  dmsg <- check_section(ofn,tpldat,"inits",params,
                         check=checkparam,
-                        bounds=param_bounds,
+                        bounds=bounds,
                         secname="PARAMETER",
                         objfunname=objfunname,
                         re_vectors=re_vectors,
@@ -408,7 +411,7 @@ do_admb <- function(fn,
   ## check DATA section
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
     stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
-  dmsg <- check_section(ofn,tpldat,"data",data_list,
+  dmsg <- check_section(ofn,tpldat,"data",data,
                         check=checkdata,
                         secname="DATA")
   if (!checkdata %in% c("write","ignore") && nchar(dmsg)>0) {
@@ -434,7 +437,7 @@ do_admb <- function(fn,
     on.exit(file.copy(fn2,fn2gen,overwrite=TRUE),add=TRUE)
     on.exit(file.copy(fn2bak,fn2,overwrite=TRUE),add=TRUE)
     writeLines(do.call("c",tpldat$secs),con=fn2)
-    tpldat <- read_tpl(paste(fn,"_gen",sep=""))
+    tpldat <- read_tpl(fn) ## get auto-generated info
   }
   args <- ""
   if (re) args <- "-r"
@@ -458,14 +461,14 @@ do_admb <- function(fn,
   ## insert check(s) for failure at this point
   if (verbose) cat("writing data and parameter files ...\n")
   ## check order of data; length of vectors???
-  dat_write(fn,data_list)
+  dat_write(fn,data)
   ## check order of parameters ??
   ## add random effects to list of initial parameters
   if (re) {
-    rv <- re_vectors[!names(re_vectors) %in% names(param_list)]
-    param_list <- c(param_list,lapply(as.list(re_vectors),rep,x=0))
+    rv <- re_vectors[!names(re_vectors) %in% names(params)]
+    params <- c(params,lapply(as.list(re_vectors),rep,x=0))
   }
-  pin_write(fn,param_list)
+  pin_write(fn,params)
   args <- ""
   if (mcmc) {
     args <- paste(args,"-mcmc",mcmcsteps)
