@@ -376,6 +376,7 @@ do_admb <- function(fn,
     fn <- tolower(fn)
     file.copy(ofn,fn,overwrite=TRUE)
   }
+
   ## require(glmmADMB)
   ## if (!re) {
   ## system(paste("makeadms",fn))
@@ -510,14 +511,15 @@ do_admb <- function(fn,
     ## FIXME: if TPL file is user-written we need to recover
     ## the *order* of mcmc pars somehow?
   }
-  ## check for NA/NaN in logLik, errors in text?
-  class(L) <- "admb"
   if (isTRUE(clean)) clean <- "all"
+  ## need to do this **AFTER** auto-generated versions get swapped around
   if (is.character(clean)) {
     ## cover both cases
-    clean_admb(ofn,clean)
-    clean_admb(fn,clean)
+    on.exit(clean_admb(ofn,clean),add=TRUE)
+    on.exit(clean_admb(fn,clean),add=TRUE)
   }
+  ## check for NA/NaN in logLik, errors in text?
+  class(L) <- "admb"
   L
 }
 

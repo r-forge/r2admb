@@ -24,15 +24,3 @@ d1 <- do_admb("toy1",
               clean=TRUE)
 
 unlink(c("toy1","toy1_gen.tpl"))
-
-## plot(ranef(gm1)$herd[[1]],coef(toyfit1)[-(1:5)]*coef(toyfit1)["sigma_herd"])
-## abline(a=0,b=1)
-## toyfit <- d()
-
-
-## library(glmmADMB)
-## try(toyfit2 <- glmm.admb(cbind(incidence,size-incidence)~period,random=~1,group="herd",
-##                     data=cbpp,family="binomial",link="logit"))
-## ## fails with 'The function maximizer failed'
-
-## library(glmmML)
