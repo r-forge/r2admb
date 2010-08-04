@@ -1,0 +1,28 @@
+ReedfrogSizepred <- 
+  data.frame(TBL = rep(c(9,12,21,25,37),each=3),
+             Kill = c(0,2,1,3,4,5,0,0,0,0,1,0,0,0,0L))
+
+library(R2admb)
+setup_admb()
+m1 <- do_admb("ReedfrogSizepred0",
+              data=c(list(nobs=nrow(ReedfrogSizepred),
+                nexposed=rep(10,nrow(ReedfrogSizepred))),
+                ReedfrogSizepred),
+              params=list(c=0.45,d=13,g=1),
+              checkparam="write",
+              checkdata="write",
+              clean=TRUE)
+m1MC <- do_admb("ReedfrogSizepred0",
+              data=c(list(nobs=nrow(ReedfrogSizepred),
+                nexposed=rep(10,nrow(ReedfrogSizepred))),
+                ReedfrogSizepred),
+                params=list(c=0.45,d=13,g=1),
+                checkparam="write",
+                checkdata="write",
+                mcmc=TRUE,
+                mcmcpars=c("c","d","g"),
+                clean=TRUE)
+unlink(c("reedfrogsizepred0.tpl",
+       "reedfrogsizepred0"))
+save("m1","m1MC",file="Reedfrog_runs.RData")
+

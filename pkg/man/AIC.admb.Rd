@@ -32,7 +32,7 @@
   Ben Bolker
 }
 \examples{
-  admbex <- system.file("doc","ADMB_runs.RData",package="R2admb")
+  admbex <- system.file("doc","Reedfrog_runs.RData",package="R2admb")
   load(admbex)
   m1
   coef(m1)

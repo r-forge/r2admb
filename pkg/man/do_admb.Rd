@@ -24,7 +24,7 @@ wd=getwd(),
   checkparam=c("stop","warn","write","ignore"),
   checkdata=c("stop","warn","write","ignore"),
 objfunname="f",
-clean=FALSE,
+clean=TRUE,
 extra.args)
 }
 \arguments{

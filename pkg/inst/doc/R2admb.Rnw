@@ -27,9 +27,24 @@
 \maketitle
 
 \SweaveOpts{keep.source=TRUE}
+<<echo=FALSE>>=
+options(continue=" ")
+@ 
 \section{Installation}
 
-(Provide hints on where to find AD Model Builder \ldots)
+The \code{R2admb} package can be installed in R in the
+standard way, using \code{install.packages} (at the moment,
+since it's on the development platform r-forge, you'll have
+to say
+<<eval=FALSE>>=
+install.packages("R2admb",repos="http://r-forge.r-project.org")
+@ 
+You can also download the file and use \code{R CMD INSTALL} from
+the command line, or (depending on your operating system/R interface)
+use a package menu.
+
+However, you'll also need AD Model Builder installed: see e.g.
+
 \begin{itemize}
 \item \url{http://admb-project.org/}
 \item \url{http://admb-project.org/downloads}
@@ -37,20 +52,34 @@
 \item \url{http://code.google.com/p/admb-project/downloads/list}
 \end{itemize}
 
-Notes: (1) depending on your operating system etc., you
-may need to install a C++ compiler (in particular, the
+You may also need to install a C++ compiler (in particular, the
 MacOS installation instructions will probably ask you
-to install gcc/g++ from the Xcode package); (2)
-you will need to have the scripts \code{admb}, \code{adcomp},
+to install gcc/g++ from the Xcode package).
+You will need to have the scripts \code{admb}, \code{adcomp},
 and \code{adlink} in the \code{bin} directory of your
-ADMB installation.
+ADMB installation (let's hope this Just Works).
 
 \section{Basics}
 
+Here's a very simple example that can easily be done
+with built-in tools in R.
+
 <<libs>>=
 library(R2admb)
-library(ggplot2)
+library(ggplot2) ## for pictures
 @ 
+
+The data are from \cite{VoneshBolker2005}, on the
+numbers of reed frog tadpoles killed by predators as
+a function of size (\code{TBL} is total body length,
+\code{Kill} is the number killed out of 10 tadpoles exposed
+to predation). Figure~\ref{fig:rfsp1} shows the data.
+
+So if $p(\mbox{kill}) = c ((S/d) \exp(1-(S/d)))^g$
+(a function for which the peak occurs at $S=d$, peak height=$c$) then
+a reasonable starting set of estimates would be
+$c=0.45$, $d=13$.
+
 
 <<dat1>>=
 ReedfrogSizepred <- 
@@ -58,31 +87,8 @@ ReedfrogSizepred <-
              Kill = c(0,2,1,3,4,5,0,0,0,0,1,0,0,0,0L))
 @ 
 
-Initial view of the data (proportion killed):
-<<fig1,fig=TRUE>>=
-g1  <- ggplot(ReedfrogSizepred,
-             aes(x=TBL,y=Kill/10))+
-  geom_point()+stat_sum(aes(size=factor(..n..)))+
-  geom_smooth()+
-  theme_bw()+
-  labs(size="n",x="Size (total body length",
-       y="Proportion killed")+
-  coord_cartesian(ylim=c(-0.05,0.55))
-print(g1)
-@ 
-
-So if $p(\mbox{kill}) = c ((S/d) \exp(1-(S/d)))^g$
-(peak occurs at $S=d$, peak height=$c$) then
-a reasonable set of first estimates would be
-$c=0.45$, $d=13$.
-
-<<startval,fig=TRUE>>=
-startest <- stat_function(fun = function(x) { 0.45*((x/13)*exp(1-x/13)) },
-                          lty=2,colour="red")
-print(g1+startest)
-@ 
-(Not great, but perhaps adequate as a starting point.)
-
+Here is the code to fit a binomial model with
+\code{mle2} using these starting points:
 <<mlefit>>=
 library(bbmle)
 m0 <- mle2(Kill~dbinom(c*((TBL/d)*exp(1-TBL/d))^g,size=10),
@@ -92,60 +98,159 @@ m0 <- mle2(Kill~dbinom(c*((TBL/d)*exp(1-TBL/d))^g,size=10),
            upper=c(c=0.8,d=20,g=20),
            control=list(parscale=c(c=0.5,d=10,g=1)))
 @ 
-<<mlefitfig,fig=TRUE>>=
+
+Generate predicted values:
+<<predvals>>=
 TBLvec = seq(9.5,36,length=100)
 predfr <- 
   data.frame(TBL=TBLvec,
              Kill=predict(m0,newdata=data.frame(TBL=TBLvec)))
+@ 
+
+\begin{figure}
+  \begin{center}
+<<fig1,echo=FALSE,fig=TRUE>>=
+g1  <- ggplot(ReedfrogSizepred,
+             aes(x=TBL,y=Kill/10))+
+  geom_point()+stat_sum(aes(size=factor(..n..)))+
+  geom_smooth()+
+  theme_bw()+
+  labs(size="n",x="Size (total body length",
+       y="Proportion killed")+
+  coord_cartesian(ylim=c(-0.05,0.55))
+startest <- stat_function(fun = function(x) { 0.45*((x/13)*exp(1-x/13)) },
+                          lty=2,colour="red")
 print(g1+startest+
       geom_line(data=predfr,colour="purple",lty=2))
 @ 
+\end{center}
+\caption{Proportions of reed frogs killed by predators,
+  as a function of total body length in mm.
+  Red: starting estimate.}
+\label{fig:rfsp1}
+\end{figure}
 
-Here's the TPL (AD Model Builder definition) file:
+Here is a \code{minimal} TPL (AD Model Builder definition) file:
 
-\VerbatimInput[frame=single,numbers=left]{ReedfrogSizepred.tpl}
+\VerbatimInput[frame=single,numbers=left,fontsize=\small]{ReedfrogSizepred0.tpl}
+
+\begin{itemize}
+  \item lines 1--4 are the \code{PARAMETER} section; most of the parameters
+    will get filled in automatically by \code{R2admb} based on the
+    input parameters you specify, but you can include
+    thie section if you need to define any additional
+    utility variables.
+    In this case we define \code{prob} as a vector indexed from
+    1 to \code{nobs} (we will specify \code{nobs},
+    the number of observations, in our data list).
+  \item most of the complexity of the \code{PROCEDURE} section
+    (lines 7 and 11--14) have to do with making sure that the
+    probabilities do not go outside the range (0,1), which is
+    not guaranteed by this model specification.  Line 7 defines
+    a utility variable; lines 11--14 adjust low probabilities
+    up to 0.001 (line 11) and high probabilities down to 0.999
+    (line 13), and add appropriate penalties to the negative
+    log-likelihood to push the optimization away from these
+    boundaries (lines 12 and 14).
+  \item the remainder of the \code{PROCEDURE} section
+    simply computes the mortality
+    probabilities as $c ((S/d) \exp(1-(S/d)))^g$
+    as specified above (l. 9) and computes the binomial
+    log-likelihood on the basis of these
+    probabilities (lines 16-18), subtracting it from
+    any penalty terms that have already accrued.
+  \end{itemize}
+    
+    
 
 <<admbfit_getruns,echo=FALSE>>=
-load("ADMB_runs.RData")
+load("Reedfrog_runs.RData")
 @ 
+
+To run this model, we save it in a text
+file called \code{ReedfrogSizepred0.tpl};
+run \verb+setup_admb()+ to locate the
+AD Model Builder binaries and libraries on
+our system; and run \verb+do_admb+ with appropriate
+arguments.
 
 <<admbfit_fake,eval=FALSE>>=
 setup_admb()
-m1 <- do_admb("ReedfrogSizepred",
+m1 <- do_admb("ReedfrogSizepred0",
               data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
-              param_list=list(c=0.45,d=13,g=1),
+              params=list(c=0.45,d=13,g=1),
+              bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+              checkparam="write",
+              checkdata="write",
               clean=TRUE)
-unlink("reedfrogsizepred.tpl")
+## clean up leftovers:
+unlink(c("reedfrogsizepred0.tpl",
+         "reedfrogsizepred0_gen.tpl",
+         "reedfrogsizepred0"))
 @ 
 
-Exercise the extractor methods:
-<<extractors>>=
+The \code{data}, \code{params}, and \code{bounds} (parameter bounds)
+arguments should be reasonably self-explanatory.
+When \code{checkparam="write"} and \code{checkdata="write"} are
+specified, \code{R2admb} attempts to write appropriate DATA
+and PARAMETER sections into a modified TPL file, leaving the
+results with the suffix \code{\_gen.tpl} at the end of the run.
+
+Here's the augmented file:
+\VerbatimInput[frame=single,numbers=left,fontsize=\small]{ReedfrogSizepred0_gen.tpl}
+
+You might instead choose to compose the whole TPL file yourself,
+in which case you can add comments appropriately:
+\VerbatimInput[frame=single,numbers=left,fontsize=\small]{ReedfrogSizepred.tpl}
+
+Now that we have fitted the model, here are some of
+the things we can do with it:
+
+\begin{itemize}
+  \item Get basic information about the fit and coefficient estimates:
+<<basic>>=
 m1
-coef(m1)
-summary(m1)
-coef(summary(m1))
-vcov(m1)
-logLik(m1)
-deviance(m1)
-AIC(m1)
 @ 
-
+\item Get vector of coefficients only:
+<<coef>>=
+coef(m1)
+@
+\item Get a coefficient table including standard errors and (approximate!!)
+  $p$ values:
+<<summary>>=
+summary(m1)
+@ 
+(you can use \code{coef(summary(m1))} to extract just the table).
+@ 
+\item Variance-covariance matrix of the parameters:
+<<vcov>>=
+vcov(m1)
+@ 
+Log-likelihood, deviance, AIC:
+<<others>>=
+c(logLik(m1),deviance(m1),AIC(m1))
+@ 
+\end{itemize}
+  
 <<admbfakemc,eval=FALSE>>=
 m1MC <- do_admb("ReedfrogSizepred",
               data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
+                params=list(c=0.45,d=13,g=1),
+                bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+                checkparam="write",
+                checkdata="write",
                 mcmc=TRUE,
-                param_list=list(c=0.45,d=13,g=1),
+                mcmcpars=c("c","d","g"),
                 clean=TRUE)
-unlink("reedfrogsizepred.tpl")
-@ 
+## clean up leftovers:
+unlink(c("reedfrogsizepred0.tpl",
+         "reedfrogsizepred0_gen.tpl",
+         "reedfrogsizepred0"))
 
-<<echo=FALSE>>=
-## clean up
-unlink("reedfrogsizepred")
 @ 
 
 <<fig=TRUE>>=
@@ -165,5 +270,8 @@ print(densityplot(as.mcmc(m1MC$mcmc)))
 print(xyplot(as.mcmc(m1MC$mcmc)))
 @ 
 
+
 \section{Random effects: gopher tortoise data}
+
+\bibliography{R2admb}
 \end{document}

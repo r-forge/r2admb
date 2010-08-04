@@ -1,15 +1,3 @@
-## TO DO:
-##   finish bounds/phase support
-##    bounds checking?
-##   careful with case of file names when writing -- change "ofn" to "fn" if writing?
-##   check for variables with "." in the name: stop? change to "_" and warn?      
-##   check for random effects vectors (don't redefine if already there)
-##   parameter/data order checking?
-##   more checks/flags of compiling step -- stop if error
-##   copying strategy when checkdata/checkparam=="write" is dangerous/fragile --
-##     gets screwed up if one tries to run the same file in more than one
-##     session.  Use temporary files/directories to sort this out?
-
 indent <- function(str,n=2) {
   paste(paste(rep(" ",n),collapse=""),str,sep="")
 }
@@ -83,6 +71,9 @@ check_section <- function(fn,
       msg <- "all values present, but order doesn't match"
     } else {
       msg <- ""
+      if (length(grep("\\.",tplnames)>1)) {
+        msg <- paste(msg,"dots in parameter/variable names")
+      }
       attach(R_list,warn.conflicts=FALSE)
       on.exit(detach(R_list),add=TRUE)
       ## now need to check dimensions etc...
@@ -161,6 +152,10 @@ check_section <- function(fn,
     ## no existing section: need title line
     sectitle <- paste(secname,"_SECTION",sep="")
     nvals <- length(R_list)
+    if (length(grep("\\.",names(R_list)>1))) {
+      warning("dots changed to underscores in parameter/variable names")
+      names(R_list) <- gsub("\\.","_",names(R_list))
+    }
     objstr <- NULL
     pars <- (secname=="PARAMETER")  ## only check bounds for parameters
     if (pars) {
@@ -351,7 +346,7 @@ do_admb <- function(fn,
                     checkparam=c("stop","warn","write","ignore"),
                     checkdata=c("stop","warn","write","ignore"),
                     objfunname="f",
-                    clean=FALSE,
+                    clean=TRUE,
                     extra.args) {
   ## TO DO: check to see if executables are found
   checkparam <- match.arg(checkparam)
@@ -406,17 +401,18 @@ do_admb <- function(fn,
       tpldat$secs <- append(tpldat$secs,list(PARAMETER=c(dmsg,"")),
                             after=which(names(tpldat$secs)=="PROCEDURE")-1)
     }
+    ## modifications to PROCEDURE section:
+    ## need to assign MCMC reporting variables
     if (mcmc) {
-      ## need to assign MCMC reporting variables
+      
       mcmcparnames <- gsub("^ +sdreport_(number|vector) r_","",
                            gsub("\\(.*$","",
                                 dmsg[grep("^ +sdreport",dmsg)]))
       tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
                                       indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
     }
-
   }
-  ## check DATA section
+    ## check DATA section
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
     stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
   dmsg <- check_section(ofn,tpldat,"data",data,
@@ -437,6 +433,15 @@ do_admb <- function(fn,
   }
   ##
   if (checkdata=="write" || checkparam=="write") {
+    parnames <- c(names(data),names(params))
+    badnames <- grep("\\.",parnames)
+    if (length(badnames)>0) {
+      for (i in badnames) {
+        old <- parnames[i]
+        new <- gsub("\\.","_",parnames[i])
+        tpldat$secs$PROCEDURE <- gsub(old,new,tpldat$secs$PROCEDURE)
+      }
+    }
     fn2 <- paste(fn,".tpl",sep="")
     fn2gen <- paste(fn,"_gen.tpl",sep="")
     fn2bak<- paste(fn,".tpl.bak",sep="")

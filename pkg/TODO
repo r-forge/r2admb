@@ -4,9 +4,10 @@
 * comparisons with PBSadmb?
 
 * add MCMC quantiles etc. to summary: 
+
 * confint method?
 -   "quad" if only se/vcov known
--   "profile"?
+-   "profile"????
 -   MCMC: quantile/HPDinterval?
 
 
@@ -14,8 +15,6 @@
    comments on adcomp/adlink/admb scripts
 
 * more checking of dat/pin files:
-  auto-construction of PARAMETERS/INIT section in tpl file?
- (Maunder)
 
 * test/document examples of random effects in vignette:
   
@@ -26,3 +25,19 @@
 * read bar (binary) rather than par file?
 
 * evaluate objective function by fixing vals
+
+* add phase support
+
+* finish bounds support: check bounds on initial parametesr?
+
+* better strategy for saving originals when changing case/auto-generating
+inputs -- temporary filenames, or temp directory??
+
+* check for variables with "." in the name: stop? change to "_" and warn?      
+
+* check for random effects vectors (don't redefine if already there)
+
+* parameter/data order checking?
+
+* more checks/flags of compiling step -- stop if error
+
