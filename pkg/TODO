@@ -3,13 +3,12 @@
 
 * comparisons with PBSadmb?
 
-* add MCMC quantiles etc. to summary: 
+* add MCMC quantiles etc. to summary: coeftab?
 
 * confint method?
 -   "quad" if only se/vcov known
 -   "profile"????
 -   MCMC: quantile/HPDinterval?
-
 
 * better setup detection, error trapping:
    comments on adcomp/adlink/admb scripts
@@ -34,6 +33,7 @@
 inputs -- temporary filenames, or temp directory??
 
 * check for variables with "." in the name: stop? change to "_" and warn?      
+  (done, needs testing)
 
 * check for random effects vectors (don't redefine if already there)
 
@@ -41,3 +41,6 @@ inputs -- temporary filenames, or temp directory??
 
 * more checks/flags of compiling step -- stop if error
 
+* more info on thinning etc. of MCMC saved/printed in final object
+
+* allow just compilation, just run from previous compilation ...

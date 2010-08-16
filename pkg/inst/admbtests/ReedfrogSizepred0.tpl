@@ -1,17 +1,7 @@
-DATA_SECTION
-
-  init_int nobs
-  init_vector nexposed(1,15)
-  init_vector TBL(1,15)
-  init_vector Kill(1,15)
-
 PARAMETER_SECTION
 
-  objective_function_value f
-  init_bounded_number c(0,1)
-  init_bounded_number d(0,50)
-  init_bounded_number g(-1,25)
   vector prob(1,nobs)    // per capita mort prob
+
 PROCEDURE_SECTION
 
   dvariable fpen=0.0;         // penalty variable

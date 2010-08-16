@@ -5,7 +5,6 @@ gm1 <- glmer(cbind(incidence, size - incidence) ~ period + (1 | herd),
 X <- model.matrix(~period,data=cbpp)
 Zherd <- model.matrix(~herd-1,data=cbpp)
 library(R2admb)
-## setup_admb("/usr/local/src/admb-project-read-only/build/dists/admb_gcc411_fedora8")
 setup_admb()
 
 tmpdat <- list(X=X,Zherd=Zherd,
@@ -20,7 +19,7 @@ d1 <- do_admb("toy1",
               checkdata="write",checkparam="write",
               mcmc=TRUE,
               mcmcpars=c("beta","sigma_herd"),
-              mcmcsteps=20,
-              clean=TRUE)
+              clean=FALSE)
 
+save("d1",file="toy1_runs.RData")
 unlink(c("toy1","toy1_gen.tpl"))

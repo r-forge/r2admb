@@ -6,7 +6,8 @@ indent <- function(str,n=2) {
 numfmt <- function(x,len=length(x)) {
   paste(x,
         formatC(seq(len),width=format.info(seq(len)),flag="0"),
-        sep="") }
+        sep="")
+}
 
 setup_admb <- function(admb_home) {
   ## check whether already set up
@@ -55,6 +56,7 @@ check_section <- function(fn,
                           phase,
                           re_vectors,
                           mcmcpars,
+                          profpars,
                           secname,
                           objfunname="f",
                           intcheck=c("strict","sloppy")) {
@@ -178,6 +180,8 @@ check_section <- function(fn,
     for (i in 1:length(R_list)) {
       x <- R_list[[i]]
       n <- names(R_list)[i]
+      ## attempt to coerce (if not all numeric, will end up as character and stop ...)
+      if (is.data.frame(x)) x <- as.matrix(x)
       is.int <- function(x) {
         ((intcheck=="strict" && storage.mode(x)=="integer") |
          (intcheck=="trunc" && all(trunc(x)==x)))}
@@ -242,7 +246,7 @@ check_section <- function(fn,
       cursec <- cursec[-1] ## drop title
       cursec <- grep("^ *$",cursec,invert=TRUE,value=TRUE)  ## drop blank lines
     }
-    restr <- mcmcstr <- NULL
+    restr <- mcmcstr <- profstr <- NULL
     if (pars) {
       ## deal with random effects vectors
       if (!is.null(re_vectors)) {
@@ -252,37 +256,48 @@ check_section <- function(fn,
         restr <- indent(paste("random_effects_vector ",names(re_vectors),
                 "(1,",re_vectors,")",sep=""))
       }
-      if(!is.null(mcmcpars)) {
-        ## find names
-        ## paste("(",apply(z,1,function(x) paste(na.omit(x),collapse=",")))
+      ## FIXME: uuuuuugly! need a better, more consistent way
+      ## of handling parameter attributes ...
+      make_names <- function(z,pref1="sdreport_",pref2="r_") {
+        if (z %in% partab$vname) { ## in newly specified parameters
+          i <- match(z,partab$vname)
+          type <- partab$type[i]
+          name <- partab$vname[i]
+          dimvals <- na.omit(unlist(partab[i,c("dim1","dim2","dim3","dim4")]))
+          dimvals <- c(rbind(rep(1,length(dimvals)),dimvals))
+        } else if (z %in% tt$vname) { ## in existing parameters
+          i <- match(z,tt$vname)
+          type <- tt$type[i]
+          name <- tt$vname[i]
+          dimvals <- na.omit(unlist(tt[i,3:7]))
+        }
+        indent(paste(pref1,type," ",pref2,name,
+                     if (length(dimvals)==0) "" else
+                     paste("(",paste(dimvals,collapse=","),")",sep=""),
+                     sep=""))
+      }
+      if(!is.null(mcmcpars) || !is.null(profpars)) {
         tt <- tpldat$info$other
         allnames <- c(partab$vname,tt$vname)
-        bad <- which(!mcmcpars %in% allnames)
-        if (length(bad)>0) {
-          stop("some mcmcpars not found in parameter table:",paste(mcmcpars[bad],collapse=", "))
-        }
-        ## FIXME: uuuuuugly! need a better, more consistent way of handling parameter attributes ...
-        mcmcstr <- sapply(mcmcpars,function(z) {
-          if (z %in% partab$vname) {
-            i <- match(z,partab$vname)
-            type <- partab$type[i]
-            name <- partab$vname[i]
-            dimvals <- na.omit(unlist(partab[i,c("dim1","dim2","dim3","dim4")]))
-            dimvals <- c(rbind(rep(1,length(dimvals)),dimvals))
-          } else if (z %in% tt$vname) {
-            i <- match(z,tt$vname)
-            type <- tt$type[i]
-            name <- tt$vname[i]
-            dimvals <- na.omit(unlist(tt[i,3:7]))
+        if (!is.null(mcmcpars)) {
+          bad <- which(!mcmcpars %in% allnames)
+          if (length(bad)>0) {
+            stop("some mcmcpars not found in parameter table:",
+                 paste(mcmcpars[bad],collapse=", "))
           }
-          indent(paste("sdreport_",type," r_",name,
-                       if (length(dimvals)==0) "" else
-                       paste("(",paste(dimvals,collapse=","),")",sep=""),
-                       sep=""))
-        })
+          mcmcstr <- sapply(mcmcpars,make_names,pref1="sdreport_",pref2="r_")
+        }
+        if (!is.null(profpars)) {
+          bad <- which(!profpars %in% allnames)
+          if (length(bad)>0) {
+            stop("some profpars not found in parameter table:",
+                 paste(profpars[bad],collapse=", "))
+          }
+          profstr <- sapply(profpars,make_names,pref1="likeprof_",pref2="p_")
+        }
       }
     }
-    return(c(sectitle,"",objstr,parstr,cursec,restr,mcmcstr))
+    return(c(sectitle,"",objstr,parstr,cursec,restr,mcmcstr,profstr))
   }
 }
 
@@ -335,6 +350,8 @@ do_admb <- function(fn,
                     re=FALSE,
                     re_vectors=NULL,
                     safe=TRUE,
+                    profile=FALSE,
+                    profpars=NULL,
                     mcmc=FALSE,
                     mcmc2=FALSE,
                     mcmcsteps=1000,
@@ -354,6 +371,8 @@ do_admb <- function(fn,
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
   if (mcmc && missing(mcmcpars) && checkparam=="write") stop("must specify mcmcpars when checkparam=='write' and mcmc is TRUE")
   if (!mcmc && !missing(mcmcpars)) stop("mcmcpars specified but mcmc is FALSE")
+  if (profile && missing(profpars) && checkparam=="write") stop("must specify profpars when checkparam=='write' and profile is TRUE")
+  if (!profile && !missing(profpars)) stop("profpars specified but profile is FALSE")
   if (!re) {
     if (mcmc2) stop("mcmc2 only applies when re=TRUE")
     if (!is.null(re_vectors)) stop("re_vectors should only be specified when re=TRUE")
@@ -389,7 +408,8 @@ do_admb <- function(fn,
                         secname="PARAMETER",
                         objfunname=objfunname,
                         re_vectors=re_vectors,
-                        mcmcpars=mcmcpars)
+                        mcmcpars=mcmcpars,
+                        profpars=profpars)
   if (!checkparam %in% c("write","ignore") && nchar(dmsg)>0) {
     if (checkparam=="stop") stop(dmsg)
     if (checkparam=="warn") warning(dmsg)
@@ -411,8 +431,20 @@ do_admb <- function(fn,
       tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
                                       indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
     }
+    if (profile) {
+      profparnames <- gsub("^ +likeprof_number p_","",
+                           gsub("\\(.*$","",
+                                dmsg[grep("^ +likeprof_",dmsg)]))
+      tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
+                                      indent(paste("p_",profparnames,"=",profparnames,";",sep="")))
+    }
   }
-    ## check DATA section
+  ## check DATA section
+  if (checkdata!="ignore") {
+    dframes <- sapply(data,data.class)=="data.frame"
+    if (any(dframes)) warning("attempted to convert data frame to matrix")
+    data[dframes] <- lapply(data[dframes],as.matrix)
+  }                              
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
     stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
   dmsg <- check_section(ofn,tpldat,"data",data,
@@ -488,6 +520,7 @@ do_admb <- function(fn,
     if (mcmcsave>0)
       args <- paste(args,"-mcsave",mcmcsave)
   }
+  if (profile) args <- paste(args,"-lprof")
   if (!missing(extra.args)) {
     args <- paste(args,extra.args)
   }
@@ -511,17 +544,21 @@ do_admb <- function(fn,
                         tpldat$info)
     L <- c(L,list(hist=read_hst(fn)))
     if (mcmcsave>0) {
-      L <- c(L,list(mcmc=read_psv(ofn,names=pnames)))
+      L$mcmc <- read_psv(ofn,names=pnames)
     }
     ## FIXME: if TPL file is user-written we need to recover
     ## the *order* of mcmc pars somehow?
+  }
+  if (profile) {
+    L$prof <- lapply(paste("p_",profpars,sep=""),read_plt)
+    names(L$prof) <- profpars
   }
   if (isTRUE(clean)) clean <- "all"
   ## need to do this **AFTER** auto-generated versions get swapped around
   if (is.character(clean)) {
     ## cover both cases
     on.exit(clean_admb(ofn,clean),add=TRUE)
-    on.exit(clean_admb(fn,clean),add=TRUE)
+    on.exit(clean_admb(fn,clean,profpars),add=TRUE)
   }
   ## check for NA/NaN in logLik, errors in text?
   class(L) <- "admb"
@@ -531,6 +568,7 @@ do_admb <- function(fn,
 str_contains <- function(x,y) {
   length(grep(x,y)>1)
 }
+
 get_names <- function(pars,info) {
   unlist(sapply(pars,
          function(p) {
@@ -606,16 +644,16 @@ AIC.admb <- function(object,...,k=2) {
 ## summary() method ...
 ##  save model file with object???
 
-clean_admb <- function(fn,which=c("all","sys","output")) {
+clean_admb <- function(fn,which=c("all","sys","output"),profpars=NULL) {
   tplfile <- paste(fn,"tpl",sep=".")
   ## need logic here!  enumeration of all files ???
   sys.ext <- c("htp","cpp","o","rep","rhes","bar","eva",
                "bgs","ecm","luu","mc2","mcm","tpl.bak")
   input.ext <- c("pin","dat")
-  output.ext <- c("log","cor","std", "par","psv","hst")
+  output.ext <- c("log","cor","std", "par","psv","hst","prf")
   sys2.ext <- c("out","cout")
   other <- c("eigv.rpt","fmin.log","variance","sims",
-             "hesscheck","hessian.bin",
+             "hesscheck","hessian.bin","dgs2","diags",
              paste("admodel",c("dep","hes","cov"),sep="."))
   which <- match.arg(which)
   if (which=="all") {
@@ -624,6 +662,9 @@ clean_admb <- function(fn,which=c("all","sys","output")) {
     ## list.files(pattern=paste("^",fn,"\\..*",sep=""))
     ##    delfiles <- setdiff(delfiles,tplfile)
     delfiles <- c(delfiles,other)
+    if (!is.null(profpars)) {
+      delfiles <- c(delfiles,paste(profpars,".plt",sep=""))
+    }
   } else {
     stop("only 'all' option is currently implemented")
   } 
@@ -678,8 +719,9 @@ read_hst <- function(fn) {
   r[w] <- lapply(r[w],function(x) 
                  as.numeric(strsplit(gsub("^ +","",x[2])," ")[[1]]))
   names(r)[w] <- c("stepsizes","means","sdevs","lower","upper","mcmcparms")
+  ## r$npars is NOT RELIABLE! use length(stepsizes instead)
   ## parameter matrices
-  w <- 11:(10+r$npars)
+  w <- 11:(10+length(r$stepsizes))
   r[w] <- lapply(r[w],
                  function(z) {
                    do.call(rbind,
@@ -884,7 +926,7 @@ read_tpl <- function(f) {
 }
 
 read_psv <- function(f,names=NULL) {
-  f <- tolower(f) ## argh
+  f <- tolower(f) ## arghv
   fn <- paste(f,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
   ans <- read_admbbin(fn)
@@ -893,6 +935,25 @@ read_psv <- function(f,names=NULL) {
   ans
 }
 
+read_plt <- function(varname) {
+  fn <- paste(varname,"plt",sep=".")
+  r <- readLines(fn)
+  cisecline <- grep("Minimum width confidence limits",r)
+  normline <- grep("Normal approximation$",r)
+  prof1 <- matrix(scan(textConnection(r[3:(cisecline[1]-1)]),quiet=TRUE),ncol=2,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("value","logliK")))
+  ci1 <- matrix(scan(textConnection(r[cisecline[1]+(2:4)]),quiet=TRUE),ncol=3,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("sig","lower","upper")))
+  profnorm <- matrix(scan(textConnection(r[(normline+1):(cisecline[2]-1)]),quiet=TRUE),ncol=2,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("value","logliK")))
+  cinorm <- matrix(scan(textConnection(r[cisecline[2]+(2:4)]),quiet=TRUE),ncol=3,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("sig","lower","upper")))
+  list(prof=prof1,ci=ci1,prof_norm=profnorm,ci_norm=cinorm)
+}
 ## read a "standard" ADMB format binary file into R:
 ##  standard format is: 1 integer describing number
 ##  of (double) values per vector
@@ -928,7 +989,7 @@ function (name, L)
             cat("\n", file = file_name, append = TRUE)
         }
     }
-}
+  }
 
 ## from glmmADMB, by Hans Skaug
 "pin_write" <-
@@ -952,7 +1013,7 @@ function (name, L)
             cat("\n", file = file_name, append = TRUE)
         }
     }
-}
+  }
 
 
 if (FALSE) {
