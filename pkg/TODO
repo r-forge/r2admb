@@ -7,19 +7,15 @@
 
 * confint method?
 -   "quad" if only se/vcov known
--   "profile"????
--   MCMC: quantile/HPDinterval?
+-   "profile" if known
+-   MCMC: quantile/HPDinterval if known
 
 * better setup detection, error trapping:
    comments on adcomp/adlink/admb scripts
 
 * more checking of dat/pin files:
 
-* test/document examples of random effects in vignette:
-  
 * ?? formula interface???
-
-* profiling?
 
 * read bar (binary) rather than par file?
 
@@ -32,8 +28,7 @@
 * better strategy for saving originals when changing case/auto-generating
 inputs -- temporary filenames, or temp directory??
 
-* check for variables with "." in the name: stop? change to "_" and warn?      
-  (done, needs testing)
+* TEST check for variables with "." in the name: stop? change to "_" and warn?      
 
 * check for random effects vectors (don't redefine if already there)
 

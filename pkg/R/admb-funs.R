@@ -498,6 +498,12 @@ do_admb <- function(fn,
   }
   ##  if (length(grep("error",coutfile)>0))
   ## HACK for ignorable ADMB-RE error messages
+  admb_warning_index <- grep("warning:",coutfile)
+  if (length(admb_warning_index)>0) {
+    admb_warnings <- paste("from ADMB:",coutfile[admb_warning_index])
+    sapply(warning,admb_warnings)
+    coutfile <- coutfile[-admb_warning_index]
+  }
   cred <- coutfile[!substr(coutfile,1,85) %in%
                    c("cat: xxalloc4.tmp: No such file or directory",
                      "cat: xxalloc5.tmp: No such file or directory",                               "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
