@@ -501,7 +501,7 @@ do_admb <- function(fn,
   admb_warning_index <- grep("warning:",coutfile)
   if (length(admb_warning_index)>0) {
     admb_warnings <- paste("from ADMB:",coutfile[admb_warning_index])
-    sapply(warning,admb_warnings)
+    sapply(admb_warnings,warning)
     coutfile <- coutfile[-admb_warning_index]
   }
   cred <- coutfile[!substr(coutfile,1,85) %in%
