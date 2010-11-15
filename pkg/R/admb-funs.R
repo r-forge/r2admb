@@ -851,10 +851,17 @@ strip_comments <- function(s) {
   gsub("[ \\\t]*//.*$","",s)
 }
 
+## processing variables
 proc_var <- function(s,drop.first=TRUE,maxlen) {
   if (drop.first) s <- s[-1]
+  ## drop LOCAL CALCS sections
+  calclocs <- grep("_CALCS *$",s)
+  if (length(calclocs)>0) {
+    droplines <- unlist(apply(matrix(-calclocs,nrow=2,byrow=TRUE),1,function(x) x[1]:x[2]))
+    s <- s[droplines]
+  }
   ## strip comments & whitespace
-  s2 <- gsub("^ *","",gsub("[;]*[ \\\t]*$","",strip_comments(s)))
+  s2 <- gsub("^[ \\\t]*","",gsub("[;]*[ \\\t]*$","",strip_comments(s)))
   s2 <- s2[nchar(s2)>0] 
   words <- strsplit(s2," ")
   type <- sapply(words,"[[",1)
