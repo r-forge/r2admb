@@ -67,8 +67,9 @@ check_section <- function(fn,
     info <- tpldat$info[[tplsec]]
     tplnames <- info$vname
     if (length(setdiff(tplnames,Rnames))>0) {
-      msg <- paste("missing values in list:",
-                   paste(setdiff(tplnames,Rnames),sep=","))
+      msg <- paste("missing values in list ",
+                   "(",secname," section): ",
+                   paste(setdiff(tplnames,Rnames),sep=","),sep="")
     } else if (length(setdiff(Rnames,tplnames))==0 && !all(tplnames==Rnames)) {
       msg <- "all values present, but order doesn't match"
     } else {
@@ -302,42 +303,69 @@ check_section <- function(fn,
 }
 
 read_pars <- function (fn) {
+  ## see
+  ##  http://admb-project.org/community/admb-meeting-march-29-31/InterfacingADMBwithR.pdf
+  ## for an alternate file reader -- does this have equivalent functionality?
   rt <- function(f,ext,...) {
-    if (file.exists(f)) read.table(paste(f,ext,sep="."),...) else NA
+    fn <- paste(f,ext,sep=".")
+    if (file.exists(fn)) read.table(fn,...) else NA
   }
   rs <- function(f,ext,comment.char="#",...) {
-    if (file.exists(f)) scan(paste(f,ext,sep="."),
-                             comment.char=comment.char,quiet=TRUE,...) else NA
+    fn <- paste(f,ext,sep=".")
+    if (file.exists(fn)) scan(fn,
+                              comment.char=comment.char,
+                              quiet=TRUE,...) else NA
   }
+  ## parameter estimates
   par_dat <- rs(fn,"par", skip = 1)
   npar <- length(par_dat)
-  sd_dat <- rt(fn,"std", skip = 1,as.is=TRUE)
-  if (length(sd_dat)==1 && is.na(sd_dat)) return(NA)
-  ## need col.names hack so read.table knows how many
-  ##  columns to read: ?read.table, "Details"
-  ncorpar <- length(readLines(paste(fn,"cor",sep=".")))-2
-  cor_dat <- rt(fn,"cor", skip = 2, fill=TRUE, 
-                as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
-  ## drop cors that are not parameters
-  ## (have dropped mc parameters)
-  cormat <- as.matrix(cor_dat[1:npar,4+(1:npar)])
-  cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
-  est <- unlist(par_dat)
-  parnames <- sd_dat[1:npar, 2]
-  if (any(duplicated(parnames))) {
-    parnames <- unlist(lapply(split(parnames,factor(parnames)),
-                              function(x) {
-                                if (length(x)==1) x else numfmt(x)
-                              }))
-  }
-  std <- sd_dat[1:npar, 4]
   tmp <- rs(fn, "par", what = "", comment.char="")
+  ## COULD get parnames out of par file, but a big nuisance
+  ##  for vectors etc.
+  ## parnames <- gsub(":$","",tmp[seq(18,by=3,length=npar)])
   loglik <- as.numeric(tmp[11])
   grad <- as.numeric(tmp[16])
-  vcov <- outer(std,std) * cormat 
-  names(est) <- names(std) <- rownames(vcov) <- rownames(cormat) <-
-    colnames(vcov) <- colnames(cormat) <- parnames
+  ## second pass to extract names from par file (ugh)
+  tmp2 <- readLines(paste(fn,".par",sep=""))
+  parlines <- grep("^#",tmp2)[-1]
+  parlen <- count.fields(paste(fn,".par",sep=""))
+  parnames <- gsub("^# +","",gsub(":$","",tmp2[parlines]))
+  parnames <- unname(unlist(mapply(function(x,len) {
+    if (len==1) x else paste(x,1:len,sep=".")
+  },
+                                   parnames,parlen)))
+  est <- unlist(par_dat)
+  names(est) <- parnames
   if (!is.finite(loglik)) warning("bad log-likelihood: fitting problem in ADMB?")
+  ## if non-pos-def hessian, cor and std files will be missing ... but
+  ##   we should still be able to retrieve some info
+  sd_dat <- rt(fn,"std", skip = 1,as.is=TRUE)
+  if (length(sd_dat)==1 && is.na(sd_dat)) {
+    warning("std file missing: some problem with fit, but retrieving parameter estimates anyway")
+    cormat <- vcov <- matrix(NA,nrow=npar,ncol=npar)
+    std <- rep(NA,npar)
+  } else {
+    ## need col.names hack so read.table knows how many
+    ##  columns to read: ?read.table, "Details"
+    ncorpar <- length(readLines(paste(fn,"cor",sep=".")))-2
+    cor_dat <- rt(fn,"cor", skip = 2, fill=TRUE, 
+                  as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
+    ## drop cors that are not parameters
+    ## (have dropped mc parameters)
+    cormat <- as.matrix(cor_dat[1:npar,4+(1:npar)])
+    cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
+    parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
+    if (any(duplicated(parnames))) {
+      parnames <- unlist(lapply(split(parnames,factor(parnames)),
+                                function(x) {
+                                  if (length(x)==1) x else numfmt(x)
+                                }))
+    }
+    std <- sd_dat[1:npar, 4]
+    vcov <- outer(std,std) * cormat
+  }
+  names(std) <- rownames(vcov) <- rownames(cormat) <-
+    colnames(vcov) <- colnames(cormat) <- parnames
   list(coefficients=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
 }
 
@@ -366,6 +394,7 @@ do_admb <- function(fn,
                     clean=TRUE,
                     extra.args) {
   ## TO DO: check to see if executables are found
+  ## TO DO: break into part 1; check/construct input files, part 2: run ADMB, 3: retrieve files from an ADMB run and package them 
   checkparam <- match.arg(checkparam)
   checkdata <- match.arg(checkdata)
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
@@ -484,6 +513,20 @@ do_admb <- function(fn,
     writeLines(do.call("c",tpldat$secs),con=fn2)
     tpldat <- read_tpl(fn) ## get auto-generated info
   }
+  if (verbose) cat("writing data and parameter files ...\n")
+  ## check order of data; length of vectors???
+  dat_write(fn,data)
+  ## check order of parameters ??
+  ## add random effects to list of initial parameters
+  if (re) {
+    rv <- re_vectors[!names(re_vectors) %in% names(params)]
+    params <- c(params,lapply(as.list(re_vectors),rep,x=0))
+  }
+  pin_write(fn,params)
+  ## insert check(s) for failure at this point
+  ## PART 2A: compile
+  test <- try(system("admb",intern=TRUE))
+  if (inherits(test,"try-error")) stop("base admb command failed: run admb_setup(), or check ADMB installation")
   args <- ""
   if (re) args <- "-r"
   if (safe) args <- paste(args,"-s")
@@ -506,20 +549,11 @@ do_admb <- function(fn,
   }
   cred <- coutfile[!substr(coutfile,1,85) %in%
                    c("cat: xxalloc4.tmp: No such file or directory",
-                     "cat: xxalloc5.tmp: No such file or directory",                               "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
+                     "cat: xxalloc5.tmp: No such file or directory",
+                     "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
   if (length(cred)>0)
     stop("errors detected in compilation: run with verbose=TRUE to view")
-  ## insert check(s) for failure at this point
-  if (verbose) cat("writing data and parameter files ...\n")
-  ## check order of data; length of vectors???
-  dat_write(fn,data)
-  ## check order of parameters ??
-  ## add random effects to list of initial parameters
-  if (re) {
-    rv <- re_vectors[!names(re_vectors) %in% names(params)]
-    params <- c(params,lapply(as.list(re_vectors),rep,x=0))
-  }
-  pin_write(fn,params)
+  ## PART 2B: run executable file
   args <- ""
   if (mcmc) {
     args <- paste(args,"-mcmc",mcmcsteps)
@@ -540,6 +574,7 @@ do_admb <- function(fn,
   }
   if (length(grep("^Error",outfile)>0))
     stop("errors detected in run: run with verbose=TRUE to view")
+  ## PART 3
   if (verbose) cat("reading output ...\n")
   L <- c(list(fn=fn,txt=res),read_pars(fn))
   if (mcmc) {
