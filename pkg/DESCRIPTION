@@ -1,8 +1,8 @@
 Package: R2admb
 Type: Package
 Title: ADMB to R interface functions
-Version: 0.6
-Date: 2010-08-03
+Version: 0.7
+Date: 2010-11-16
 Author: Ben Bolker, Hans Skaug
 Maintainer: Ben Bolker <bbolker@gmail.com>
 Description: A series of functions to call AD Model Builder (i.e., compile and run models) from within R, read the results back into R as "admb" objects, and provide standard accessors (i.e. coef(), vcov(), etc.)

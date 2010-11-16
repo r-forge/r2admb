@@ -19,11 +19,13 @@
 
 * read bar (binary) rather than par file?
 
+* read hessian file?
+
 * evaluate objective function by fixing vals
 
 * add phase support
 
-* finish bounds support: check bounds on initial parametesr?
+* finish bounds support: check bounds on initial parameters?
 
 * better strategy for saving originals when changing case/auto-generating
 inputs -- temporary filenames, or temp directory??
@@ -32,10 +34,12 @@ inputs -- temporary filenames, or temp directory??
 
 * check for random effects vectors (don't redefine if already there)
 
-* parameter/data order checking?
+* parameter/data order checking? (done, I think)
 
 * more checks/flags of compiling step -- stop if error
 
 * more info on thinning etc. of MCMC saved/printed in final object
 
 * allow just compilation, just run from previous compilation ...
+
+* double-check parnames in read_pars(), compare with Nielsen version
