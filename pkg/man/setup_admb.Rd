@@ -9,14 +9,15 @@ Attempts to set environment variables so that AD Model Builder will "just work" 
 }
 \usage{
 setup_admb(admb_home)
-clean_admb(fn, which=c("all","sys","output"),profpars)
+clean_admb(fn, which=c("all","sys","output"),profpars=NULL)
 }
 \arguments{
   \item{admb_home}{(character) directory containing AD Model Builder
     binary files}
   \item{fn}{(character) base name of ADMB model files}
   \item{which}{what to remove (system/output files or input files)}
-  \item{profpars}{(character) names of parameters that have been profiled}
+  \item{profpars}{(character) names of parameters that have been profiled (i.e.,
+   \code{.plt} files to remove)}
 }
 \note{Only 'all' option is currently implemented in clean_admb()
   [i.e., remove all except TPL file]

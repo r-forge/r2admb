@@ -19,7 +19,7 @@ mcmc = FALSE,
 mcmc2 = FALSE,
 mcmcsteps = 1000,
 mcmcsave = max(1,round(mcmcsteps/1000)),
-mcmcpars,
+mcmcpars = NULL,
 impsamp = FALSE,
 verbose=FALSE,
 wd=getwd(),
@@ -44,8 +44,8 @@ extra.args)
   \item{re_vectors}{a named numeric vector of the identities and lengths
     of any random effects vectors used in the TPL file}
   \item{safe}{(logical) compile in safe mode?}
-  \item{profile}{(logical) compute likelihood profiles?}
-  \item{profpars}{(character) vector of parameter names to profile}
+  \item{profile}{(logical) generate likelihood profiles? (untested!)}
+  \item{profpars}{(character) vector of names of parameters to profile}
   \item{mcmc}{(logical) run MCMC around best fit?}
   \item{mcmc2}{(logical) run MCMC including random effects (RE only)?}
   \item{mcmcsteps}{integer) number of MCMC steps to run}
