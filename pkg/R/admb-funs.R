@@ -526,7 +526,7 @@ do_admb <- function(fn,
   ## insert check(s) for failure at this point
   ## PART 2A: compile
   test <- try(system("admb",intern=TRUE))
-  if (inherits(test,"try-error")) stop("base admb command failed: run admb_setup(), or check ADMB installation")
+  if (inherits(test,"try-error")) stop("base admb command failed: run setup_admb(), or check ADMB installation")
   args <- ""
   if (re) args <- "-r"
   if (safe) args <- paste(args,"-s")
@@ -586,6 +586,7 @@ do_admb <- function(fn,
     L <- c(L,list(hist=read_hst(fn)))
     if (mcmcsave>0) {
       L$mcmc <- read_psv(ofn,names=pnames)
+      attr(L$mcmc,"mcpar") <- c(1,mcmcsteps,mcmcsave)
     }
     ## FIXME: if TPL file is user-written we need to recover
     ## the *order* of mcmc pars somehow?
@@ -639,7 +640,8 @@ print.admb <- function(x, verbose=FALSE, ...) {
   cat("Coefficients:\n")
   print(unlist(x$coefficients))
   if (!is.null(x$mcmc)) {
-    cat("MCMC: ",nrow(x$mcmc)," steps\n")
+    mcpar <- attr(x$mcmc,"mcpar")
+    cat("MCMC: start=",mcpar[1],", end=",mcpar[2],", thin=",mcpar[3],"\n")
   }
   if (verbose) cat(x$txt,sep="\n")
 }      
