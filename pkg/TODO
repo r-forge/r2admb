@@ -15,6 +15,10 @@
 
 * more checking of dat/pin files:
 
+* allow for more sections in TPL file to passed through "as is"
+
+* test/document examples of random effects in vignette:
+  
 * ?? formula interface???
 
 * read bar (binary) rather than par file?
@@ -22,6 +26,12 @@
 * read hessian file?
 
 * evaluate objective function by fixing vals
+
+* restructure into three chunks: (1) check and construct TPL/data files; (2) run ADMB;
+(3) pull results into R (and clean up?) -- generate shell script for run?  generate
+versioned TPL file?  (all to simplify use e.g. by people who will upload to a cluster)
+
+=======
 
 * add phase support
 
@@ -43,3 +53,4 @@ inputs -- temporary filenames, or temp directory??
 * allow just compilation, just run from previous compilation ...
 
 * double-check parnames in read_pars(), compare with Nielsen version
+>>>>>>> .r32
