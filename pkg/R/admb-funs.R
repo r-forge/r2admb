@@ -182,13 +182,16 @@ check_section <- function(fn,
       x <- R_list[[i]]
       n <- names(R_list)[i]
       ## attempt to coerce (if not all numeric, will end up as character and stop ...)
+      errmsg <- paste("(param #",
+                   i,": ",n,")",sep="")
       if (is.data.frame(x)) x <- as.matrix(x)
       is.int <- function(x) {
         ((intcheck=="strict" && storage.mode(x)=="integer") |
          (intcheck=="trunc" && all(trunc(x)==x)))}
       if (is.int(x) && !is.null(dim(x)) &&
           length(dim(x))>2) {
-        stop("can't handle integer arrays of dimension>2")
+        stop("can't handle integer arrays of dimension>2",
+                   errmsg)
       }
       if (is.int(x)) {
         if (length(x)==1 && is.null(dim(x))) {
@@ -230,16 +233,19 @@ check_section <- function(fn,
           partab$dim2 <- dim(x)[2]
         } else if (!is.null(dim(x)) && length(dim(x))>2) {
           ndim <- length(dim(x))
-          if (ndim>7) stop("can't handle arrays of dim>7")
+          if (ndim>7) stop("can't handle arrays of dim>7",errmsg)
           parstr[i] <- paste("init_",ndim,"array",
                   n," (",
                   paste(c(rbind(rep(1,ndim),dim(x))),
                         collapse=","),")",sep="")
           partab$type[i] <- "array"
           ## FIXME: store array dimensions?
-          if (!is.null(mcmcpars)) stop("arrays currently incompatible with MCMC")
+          if (!is.null(mcmcpars))
+            stop("arrays currently incompatible with MCMC",errmsg)
         } ## multi-dim array
-      } else stop("can only handle numeric values")
+      } else {
+        stop("can only handle numeric values",errmsg)
+      }
     } ## loop over R list
     parstr <- indent(parstr)
     cursec <- tpldat$secs[[secname]]
@@ -520,7 +526,7 @@ do_admb <- function(fn,
   ## add random effects to list of initial parameters
   if (re) {
     rv <- re_vectors[!names(re_vectors) %in% names(params)]
-    params <- c(params,lapply(as.list(re_vectors),rep,x=0))
+    params <- c(params,lapply(as.list(rv),rep,x=0))
   }
   pin_write(fn,params)
   ## insert check(s) for failure at this point
