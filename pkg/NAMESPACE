@@ -1,4 +1,4 @@
-export(setup_admb,clean_admb,do_admb)
+export(setup_admb,clean_admb,do_admb,stdEr)
 import(ggplot2)
 
 S3method(print,admb)
@@ -10,3 +10,4 @@ S3method(logLik,admb)
 S3method(deviance,admb)
 S3method(summary,admb)
 S3method(plot,admb_hist)
+S3method(stdEr,admb)

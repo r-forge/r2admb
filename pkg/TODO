@@ -1,7 +1,18 @@
+* attach data as well when checking bounds in DATA section
 
-* weaken ggplot2 dependency, if possible
+* don't try to check data/params at all when check is set to "ignore"
+
+* fix integer trap!
+
+* document write_files; modularize further (allow turning off compile, etc.)
+
+* weaken/eliminate ggplot2 dependency
 
 * comparisons with PBSadmb?
+
+* implement "fixed" argument (set phase <0)
+
+* support for transformations (on the fly)?
 
 * add MCMC quantiles etc. to summary: coeftab?
 

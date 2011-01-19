@@ -12,6 +12,7 @@ bounds=NULL,
 phase=NULL,
 re = FALSE,
 re_vectors = NULL,
+data_type = NULL,
 safe = TRUE,
 profile = FALSE,
 profpars = NULL,
@@ -25,6 +26,7 @@ verbose=FALSE,
 wd=getwd(),
   checkparam=c("stop","warn","write","ignore"),
   checkdata=c("stop","warn","write","ignore"),
+write_files=TRUE,
 objfunname="f",
 clean=TRUE,
 extra.args)
@@ -43,6 +45,9 @@ extra.args)
   \item{re}{(logical) use random effects?}
   \item{re_vectors}{a named numeric vector of the identities and lengths
     of any random effects vectors used in the TPL file}
+  \item{data_type}{a named vector specifying (optional)
+    data types for parameters, in parname="storage mode" format
+    (e.g. \code{c(x="integer",y="numeric")})}
   \item{safe}{(logical) compile in safe mode?}
   \item{profile}{(logical) generate likelihood profiles? (untested!)}
   \item{profpars}{(character) vector of names of parameters to profile}
@@ -60,6 +65,7 @@ extra.args)
     "write" to attach an appropriate section to the TPL file,
     and "ignore" to ignore mismatches}
   \item{checkdata}{result of data checks (as for checkparam)}
+  \item{write_files}{write data/parameter files?}
   \item{objfunname}{(character) name for objective function in TPL file
     (only relevant if \code{checkparam} is set to "write")}
   \item{clean}{remove output and working files when finished}

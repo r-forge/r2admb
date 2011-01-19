@@ -270,7 +270,7 @@ specify \code{profile=TRUE} and give a list of the parameters
 you want profiled.
 
 <<profrun,eval=FALSE>>=
-m1P <- do_admb(fn,
+m1P <- do_admb("ReedfrogSizepred0",
               data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
@@ -502,5 +502,6 @@ HPDinterval(as.mcmc(d1$mcmc[,6:20]))
 
 That's all for now.
 
+%\section{Pella-Tomlinson model}
 \bibliography{R2admb}
 \end{document}

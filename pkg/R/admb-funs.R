@@ -53,13 +53,14 @@ check_section <- function(fn,
                           R_list,
                           check,
                           bounds,
+                          data_type,
                           phase,
                           re_vectors,
                           mcmcpars,
                           profpars,
                           secname,
                           objfunname="f",
-                          intcheck=c("strict","sloppy")) {
+                          intcheck=c("strict","sloppy","none")) {
   intcheck <- match.arg(intcheck)
   Rnames  <- names(R_list)
   msg <- ""
@@ -185,47 +186,62 @@ check_section <- function(fn,
       errmsg <- paste("(param #",
                    i,": ",n,")",sep="")
       if (is.data.frame(x)) x <- as.matrix(x)
-      is.int <- function(x) {
-        ((intcheck=="strict" && storage.mode(x)=="integer") |
-         (intcheck=="trunc" && all(trunc(x)==x)))}
-      if (is.int(x) && !is.null(dim(x)) &&
+      is.int <- function(x,n=NULL,debug=FALSE) {
+        opt_in <- (!is.null(data_type) && !is.null(n) &&
+                   n %in% names(data_type)[data_type=="integer"])
+        opt_out <- (!is.null(data_type) && !is.null(n) &&
+                    n %in% names(data_type)[data_type!="integer"])
+        trunc_test <- all(trunc(x)==x)
+        mode_test <- storage.mode(x)=="integer"
+        if (debug) cat("opt_in",opt_in,"opt_out",opt_out,
+                       "trunc_test",trunc_test,"mode_test",mode_test,"\n")
+        opt_in || (!opt_out &&
+                   !intcheck=="none" &&
+                   ((intcheck=="strict" && mode_test) ||
+                    (intcheck=="trunc" && trunc_test)))
+      }
+      if (is.int(x,n) && !is.null(dim(x)) &&
           length(dim(x))>2) {
         stop("can't handle integer arrays of dimension>2",
                    errmsg)
       }
-      if (is.int(x)) {
+      if (is.int(x,n)) {
         if (length(x)==1 && is.null(dim(x))) {
           parstr[i] <- paste("init_int",n)
           partab$type[i] <- "int"
         } else if (length(x)>1 && is.null(dim(x))) {
-          parstr[i] <- paste("init_ivector ",n," (1,",length(x),")",sep="")
+          parstr[i] <- paste("init_ivector ",n,"(1,",length(x),")",sep="")
           partab$type[i] <- "ivector"
           partab$dim1 <- length(x)
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
-          parstr[i] <- paste("init_imatrix",n,
-                  " (1,",dim(x)[1],",1,",dim(x)[2],")")
+          parstr[i] <- paste("init_imatrix ",n,
+                  "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
           partab$dim1 <- dim(x)[1]
           partab$dim2 <- dim(x)[2]
         }
-      } else if (storage.mode(x) %in% c("numeric","double")) {
-        if (length(x)==1 && is.null(dim(x))) {
-          if (pars && !is.null(bounds) && n %in% names(bounds)) {
-            parstr[i] <- paste("init_bounded_number ",n,
-                               "(",bounds[[n]][1],",",bounds[[n]][2],")",sep="")
-          } else {
-            parstr[i] <- paste("init_number",n)           
-          }
-          partab$type[i] <- "number"
-        } else if (length(x)>1 && is.null(dim(x))) {
-          if (pars && !is.null(bounds) && n %in% names(bounds)) {
-            parstr[i] <- paste("init_bounded_vector ",n,
-                    "(1,",length(x),bounds[[n]][1],",",bounds[[n]][2],")",sep="")
-          } else {
-            parstr[i] <- paste("init_vector ",n,"(1,",length(x),")",sep="")
-          }
-          partab$type[i] <- "vector"
-          partab$dim1[i] <- length(x)
-        } else if (!is.null(dim(x)) && length(dim(x))==2) {
+      } else if ((!is.null(data_type) &&
+                  n %in% names(data_type)[data_type=="numeric"]) ||
+                 storage.mode(x) %in% c("numeric","double") ||
+                 (storage.mode(x)=="integer" && intcheck=="none"))
+        {
+          if (length(x)==1 && is.null(dim(x))) {
+            if (pars && !is.null(bounds) && n %in% names(bounds)) {
+              parstr[i] <- paste("init_bounded_number ",n,
+                                 "(",bounds[[n]][1],",",bounds[[n]][2],")",sep="")
+            } else {
+              parstr[i] <- paste("init_number",n)           
+            }
+            partab$type[i] <- "number"
+          } else if (length(x)>1 && is.null(dim(x))) {
+            if (pars && !is.null(bounds) && n %in% names(bounds)) {
+              parstr[i] <- paste("init_bounded_vector ",n,
+                                 "(1,",length(x),bounds[[n]][1],",",bounds[[n]][2],")",sep="")
+            } else {
+              parstr[i] <- paste("init_vector ",n,"(1,",length(x),")",sep="")
+            }
+            partab$type[i] <- "vector"
+            partab$dim1[i] <- length(x)
+          } else if (!is.null(dim(x)) && length(dim(x))==2) {
           parstr[i] <- paste("init_matrix ",n,
                   "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
           partab$type[i] <- "matrix"
@@ -330,7 +346,7 @@ read_pars <- function (fn) {
   ##  for vectors etc.
   ## parnames <- gsub(":$","",tmp[seq(18,by=3,length=npar)])
   loglik <- as.numeric(tmp[11])
-  grad <- as.numeric(tmp[16])
+  maxgrad <- as.numeric(tmp[16])
   ## second pass to extract names from par file (ugh)
   tmp2 <- readLines(paste(fn,".par",sep=""))
   parlines <- grep("^#",tmp2)[-1]
@@ -372,7 +388,7 @@ read_pars <- function (fn) {
   }
   names(std) <- rownames(vcov) <- rownames(cormat) <-
     colnames(vcov) <- colnames(cormat) <- parnames
-  list(coefficients=est, se=std, loglik=-loglik, grad=-grad, cor=cormat, vcov=vcov)
+  list(coefficients=est, se=std, loglik=-loglik, maxgrad=-maxgrad, cor=cormat, vcov=vcov)
 }
 
 do_admb <- function(fn,
@@ -383,6 +399,7 @@ do_admb <- function(fn,
                     ## FIXME: allow phases?
                     re=FALSE,
                     re_vectors=NULL,
+                    data_type=NULL,
                     safe=TRUE,
                     profile=FALSE,
                     profpars=NULL,
@@ -396,6 +413,7 @@ do_admb <- function(fn,
                     wd=getwd(),
                     checkparam=c("stop","warn","write","ignore"),
                     checkdata=c("stop","warn","write","ignore"),
+                    write_files=TRUE,
                     objfunname="f",
                     clean=TRUE,
                     extra.args) {
@@ -437,14 +455,17 @@ do_admb <- function(fn,
   ### check PARAMETER section
   if (!checkparam %in% c("write","ignore") && is.null(tplinfo$inits))
     stop("must specify PARAMETER section (or set 'checkparam' to 'write' or 'ignore')")
-  dmsg <- check_section(ofn,tpldat,"inits",params,
-                        check=checkparam,
-                        bounds=bounds,
-                        secname="PARAMETER",
-                        objfunname=objfunname,
-                        re_vectors=re_vectors,
-                        mcmcpars=mcmcpars,
-                        profpars=profpars)
+  if (checkparam!="ignore") {
+    dmsg <- check_section(ofn,tpldat,"inits",params,
+                          check=checkparam,
+                          bounds=bounds,
+                          data_type=data_type,
+                          secname="PARAMETER",
+                          objfunname=objfunname,
+                          re_vectors=re_vectors,
+                          mcmcpars=mcmcpars,
+                          profpars=profpars)
+  }
   if (!checkparam %in% c("write","ignore") && nchar(dmsg)>0) {
     if (checkparam=="stop") stop(dmsg)
     if (checkparam=="warn") warning(dmsg)
@@ -482,20 +503,23 @@ do_admb <- function(fn,
   }                              
   if (!checkdata %in% c("write","ignore") && is.null(tplinfo$data))
     stop("must specify DATA section (or set 'checkdata' to 'write' or 'ignore')")
-  dmsg <- check_section(ofn,tpldat,"data",data,
-                        check=checkdata,
-                        secname="DATA")
-  if (!checkdata %in% c("write","ignore") && nchar(dmsg)>0) {
-    if (checkdata=="stop") stop(dmsg)
-    if (checkdata=="warn") warning(dmsg)
-    
-  } else if (checkdata=="write") {
-    if (!is.null(tpldat$secs$DATA)) {
-      tpldat$secs$DATA <- dmsg
-    } else {
-      ## insert immediately before PARAMETER
-      tpldat$secs <- append(tpldat$secs,list(DATA=c(dmsg,"")),
-                            after=which(names(tpldat$secs)=="PARAMETER")-1)
+  if (checkdata != "ignore") {
+    dmsg <- check_section(ofn,tpldat,"data",data,
+                          check=checkdata,
+                          data_type=data_type,
+                          secname="DATA")
+    if (!checkdata %in% c("write","ignore") && nchar(dmsg)>0) {
+      if (checkdata=="stop") stop(dmsg)
+      if (checkdata=="warn") warning(dmsg)
+      
+    } else if (checkdata=="write") {
+      if (!is.null(tpldat$secs$DATA)) {
+        tpldat$secs$DATA <- dmsg
+      } else {
+        ## insert immediately before PARAMETER
+        tpldat$secs <- append(tpldat$secs,list(DATA=c(dmsg,"")),
+                              after=which(names(tpldat$secs)=="PARAMETER")-1)
+      }
     }
   }
   ##
@@ -519,16 +543,18 @@ do_admb <- function(fn,
     writeLines(do.call("c",tpldat$secs),con=fn2)
     tpldat <- read_tpl(fn) ## get auto-generated info
   }
-  if (verbose) cat("writing data and parameter files ...\n")
-  ## check order of data; length of vectors???
-  dat_write(fn,data)
-  ## check order of parameters ??
-  ## add random effects to list of initial parameters
-  if (re) {
-    rv <- re_vectors[!names(re_vectors) %in% names(params)]
-    params <- c(params,lapply(as.list(rv),rep,x=0))
+  if (write_files) {
+    if (verbose) cat("writing data and parameter files ...\n")
+    ## check order of data; length of vectors???
+    dat_write(fn,data)
+    ## check order of parameters ??
+    ## add random effects to list of initial parameters
+    if (re) {
+      rv <- re_vectors[!names(re_vectors) %in% names(params)]
+      params <- c(params,lapply(as.list(rv),rep,x=0))
+    }
+    pin_write(fn,params)
   }
-  pin_write(fn,params)
   ## insert check(s) for failure at this point
   ## PART 2A: compile
   test <- try(system("admb",intern=TRUE))
@@ -681,9 +707,14 @@ print.summary.admb <- function(x,
             na.print = "NA", ...)
 }
 
+stdEr <- function(x, ...) {
+  UseMethod("stdEr")
+}
+
 coef.admb <- function(object,...) object$coefficients
 logLik.admb <- function(object,...) object$loglik
 vcov.admb <- function(object,...) object$vcov
+stdEr.admb <- function(object,...) sqrt(diag(object$vcov))
 deviance.admb <- function(object,...) -2*object$loglik
 AIC.admb <- function(object,...,k=2) {
   if (length(list(...))>0) stop("multi-object AIC not yet implemented")
@@ -996,18 +1027,26 @@ read_plt <- function(varname) {
   r <- readLines(fn)
   cisecline <- grep("Minimum width confidence limits",r)
   normline <- grep("Normal approximation$",r)
-  prof1 <- matrix(scan(textConnection(r[3:(cisecline[1]-1)]),quiet=TRUE),ncol=2,
+  t1 <- textConnection(r[3:(cisecline[1]-1)])
+  prof1 <- matrix(scan(t1,quiet=TRUE),ncol=2,
                   byrow=TRUE,
-                  dimnames=list(NULL,c("value","logliK")))
-  ci1 <- matrix(scan(textConnection(r[cisecline[1]+(2:4)]),quiet=TRUE),ncol=3,
-                  byrow=TRUE,
-                  dimnames=list(NULL,c("sig","lower","upper")))
-  profnorm <- matrix(scan(textConnection(r[(normline+1):(cisecline[2]-1)]),quiet=TRUE),ncol=2,
-                  byrow=TRUE,
-                  dimnames=list(NULL,c("value","logliK")))
-  cinorm <- matrix(scan(textConnection(r[cisecline[2]+(2:4)]),quiet=TRUE),ncol=3,
+                  dimnames=list(NULL,c("value","logLik")))
+  close(t1)
+  t2 <- textConnection(r[cisecline[1]+(2:4)])
+  ci1 <- matrix(scan(t2,quiet=TRUE),ncol=3,
                   byrow=TRUE,
                   dimnames=list(NULL,c("sig","lower","upper")))
+  close(t2)
+  t3 <- textConnection(r[(normline+1):(cisecline[2]-1)])
+  profnorm <- matrix(scan(t3,quiet=TRUE),ncol=2,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("value","logliK")))
+  close(t3)
+  t4 <- textConnection(r[cisecline[2]+(2:4)])
+  cinorm <- matrix(scan(t4,quiet=TRUE),ncol=3,
+                  byrow=TRUE,
+                  dimnames=list(NULL,c("sig","lower","upper")))
+  close(t4)
   list(prof=prof1,ci=ci1,prof_norm=profnorm,ci_norm=cinorm)
 }
 ## read a "standard" ADMB format binary file into R:
@@ -1090,3 +1129,29 @@ if (FALSE) {
   }
 }
 
+## confint.default works
+confint.admb <- function(object, parm, level=0.95, method="default", ...) {
+  if (method %in% c("default","quad")) {
+    confint.default(object)
+  } else if (method=="profile") {
+    vals <- object[["prof"]]
+    if (is.null(vals)) stop("model not fitted with profile=TRUE")
+    if (!level %in% c(0.9,0.95,975)) stop("arbitrary levels not yet implemented:",
+                                          "level must be in (0.9,0.95,0.975)")
+    tab <- t(sapply(vals,function(x) {
+      x$ci[x$ci[,"sig"]==level,c("lower","upper")]
+    }))
+    colnames(tab) <- paste(c((1-level)/2,(1+level)/2)*100,"%")
+    tab
+  } else if (method %in% c("quantile","HPDinterval")) {
+    vals <- object[["mcmc"]]
+    if (is.null(vals)) stop("model not fitted with mcmc=TRUE")
+    if (method=="quantile") {
+      tab <- t(apply(vals,2,quantile,c((1-level)/2,(1+level)/2)))
+    } else {
+      require(coda)
+      tab <- HPDinterval(as.mcmc(vals))
+      colnames(tab) <- paste(c((1-level)/2,(1+level)/2)*100,"%")
+    }
+  }
+}
