@@ -42,7 +42,8 @@ extra.args)
   \item{bounds}{named list of 2-element vectors of lower and upper
     bounds for specified parameters}
   \item{phase}{named numeric vector of phases (not implemented yet)}
-  \item{re}{(logical) use random effects?}
+  \item{re}{(logical) use random effects?
+    \emph{Must be specified in order to use \code{ADMB_RE} models.}}
   \item{re_vectors}{a named numeric vector of the identities and lengths
     of any random effects vectors used in the TPL file}
   \item{data_type}{a named vector specifying (optional)
