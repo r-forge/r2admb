@@ -393,16 +393,20 @@ read_pars <- function (fn) {
 
 do_admb <- function(fn,
                     data,
+                    ## clean up argument list: bounds, phase as attributes on data?
                     params,
-                    bounds=NULL, ## maybe specify some other way, e.g. as attributes on data?
-                    phase=NULL,
-                    ## FIXME: allow phases?
+                    bounds=NULL,
+                    phase=NULL,    ## FIXME: implement phases
+                    ## clean up argument list: re if re_vectors is not NULL/missing?
                     re=FALSE,
                     re_vectors=NULL,
+                    ## clean up argument list: kluge?
                     data_type=NULL,
                     safe=TRUE,
+                    ## clean up argument list: profile if profpars is not NULL/missing?
                     profile=FALSE,
                     profpars=NULL,
+                    ## clean up argument list: mcmcpars, mcmc.control?
                     mcmc=FALSE,
                     mcmc2=FALSE,
                     mcmcsteps=1000,
@@ -413,12 +417,18 @@ do_admb <- function(fn,
                     wd=getwd(),
                     checkparam=c("stop","warn","write","ignore"),
                     checkdata=c("stop","warn","write","ignore"),
+                    ## actions=c("compile","write","run","read"),
+                    ## or should this be compile=TRUE, write=TRUE, run=TRUE, read=TRUE?
                     write_files=TRUE,
                     objfunname="f",
                     clean=TRUE,
                     extra.args) {
   ## TO DO: check to see if executables are found
-  ## TO DO: break into part 1; check/construct input files, part 2: run ADMB, 3: retrieve files from an ADMB run and package them 
+  ## MODULARIZE (separate sub-function):
+  ##  check/construct input&data files, optionally write TPL file ("write")
+  ##  compile
+  ##  run
+  ##  retrieve & package output
   checkparam <- match.arg(checkparam)
   checkdata <- match.arg(checkdata)
   if (mcmc && mcmc2) stop("only one of mcmc and mcmc2 can be specified")
