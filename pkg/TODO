@@ -1,32 +1,38 @@
+
+Clean-up/documentation:
+
+  * make sure strategy for copying modifying TPL files is robust:
+should work reliably even for mixed-case input file names, and should
+always survive a crash well.
+  e.g. rather than moving the original tpl file out of the way, use
+the _gen file, then move _gen results when finished.
+
+  * clean up argument list
+
+  * make sure strategy for guessing/specifying mode of data (esp. numeric/integer)
+is robust
+
+  * modularize run: should be able to do any one of
+    = write data and input files
+    = write modified TPL file based on data/input
+    = compile
+    = run
+    = read results back into R
+ 
+  * implement: phases, 'fixed' argument (set phase < 0); check bounds relative to starting values
+
+  * accessors: confint, coeftab, coefplot
+
 * attach data as well when checking bounds in DATA section
-
-* don't try to check data/params at all when check is set to "ignore"
-
-* fix integer trap!
-
-* document write_files; modularize further (allow turning off compile, etc.)
 
 * weaken/eliminate ggplot2 dependency
 
 * comparisons with PBSadmb?
 
-* implement "fixed" argument (set phase <0)
-
 * support for transformations (on the fly)?
-
-* add MCMC quantiles etc. to summary: coeftab?
-
-* confint method?
--   "quad" if only se/vcov known
--   "profile" if known
--   MCMC: quantile/HPDinterval if known
 
 * better setup detection, error trapping:
    comments on adcomp/adlink/admb scripts
-
-* more checking of dat/pin files:
-
-* allow for more sections in TPL file to passed through "as is"
 
 * test/document examples of random effects in vignette:
   
@@ -38,14 +44,6 @@
 
 * evaluate objective function by fixing vals
 
-* restructure into three chunks: (1) check and construct TPL/data files; (2) run ADMB;
-(3) pull results into R (and clean up?) -- generate shell script for run?  generate
-versioned TPL file?  (all to simplify use e.g. by people who will upload to a cluster)
-
-=======
-
-* add phase support
-
 * finish bounds support: check bounds on initial parameters?
 
 * better strategy for saving originals when changing case/auto-generating
@@ -55,13 +53,8 @@ inputs -- temporary filenames, or temp directory??
 
 * check for random effects vectors (don't redefine if already there)
 
-* parameter/data order checking? (done, I think)
-
 * more checks/flags of compiling step -- stop if error
 
 * more info on thinning etc. of MCMC saved/printed in final object
 
-* allow just compilation, just run from previous compilation ...
 
-* double-check parnames in read_pars(), compare with Nielsen version
->>>>>>> .r32
