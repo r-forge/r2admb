@@ -29,6 +29,7 @@ wd=getwd(),
 write_files=TRUE,
 objfunname="f",
 clean=TRUE,
+ignore_admb_errors=FALSE,
 extra.args)
 }
 \arguments{
@@ -70,6 +71,7 @@ extra.args)
   \item{objfunname}{(character) name for objective function in TPL file
     (only relevant if \code{checkparam} is set to "write")}
   \item{clean}{remove output and working files when finished}
+  \item{ignore_admb_errors}{what it says: use at your own risk!}
   \item{extra.args}{(character) extra argument string to pass to admb}
 }
 \value{

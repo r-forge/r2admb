@@ -4,6 +4,8 @@
 \alias{logLik.admb}
 \alias{coef.admb}
 \alias{deviance.admb}
+\alias{stdEr}
+\alias{stdEr.admb}
 \title{
   Standard accessor functions for ADMB model fits
 }
@@ -17,6 +19,8 @@
 \method{deviance}{admb}(object, \dots)
 \method{vcov}{admb}(object, \dots)
 \method{coef}{admb}(object,\dots)
+\method{stdEr}{admb}(object,\dots)
+stdEr(object,\dots)
 }
 \arguments{
   \item{object}{an ADMB model fit (of class "admb")}

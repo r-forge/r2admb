@@ -1,3 +1,16 @@
+test_OScase <- function(dir=getwd()) {
+  fn1 <- tempfile(tmpdir=dir)
+  fn2 <- gsub("/([^/]+)$","/\\U\\1",fn1,perl=TRUE)
+  if (!file.create(fn1)) stop("can't create temporary file")
+  ## attempt to copy: will return FALSE if 'file already exists', i.e.
+  ##  file system is case-insensitive.  Could also use file.rename(), but
+  ##  would have to suppress warning msg
+  res <- file.copy(fn1,fn2)
+  unlink(fn1)
+  unlink(fn2)
+  res
+}
+ 
 do_admb <- function(fn,
                     data,
                     ## clean up argument list: bounds, phase as attributes on data?
@@ -29,6 +42,7 @@ do_admb <- function(fn,
                     write_files=TRUE,
                     objfunname="f",
                     clean=TRUE,
+                    ignore_admb_errors=FALSE,
                     extra.args) {
   ## TO DO: check to see if executables are found
   ## MODULARIZE (separate sub-function):
@@ -58,7 +72,7 @@ do_admb <- function(fn,
   orig_tplfile <- tplfile
   ofn <- fn
   ## FIXME: need to make this work on MacOS/Windows, and safe
-  if (!tolower(fn)==fn) {
+  if (test_OScase() && !tolower(fn)==fn) {
     warning("Base name converted to lower case for ADMB compatibility: copying TPL file")
     tplfile <- tolower(tplfile)
     fn <- tolower(fn)
@@ -196,18 +210,22 @@ do_admb <- function(fn,
     cat(coutfile,sep="\n")
   }
   ##  if (length(grep("error",coutfile)>0))
-  ## HACK for ignorable ADMB-RE error messages
-  admb_warning_index <- grep("warning:",coutfile)
-  if (length(admb_warning_index)>0) {
-    admb_warnings <- paste("from ADMB:",coutfile[admb_warning_index])
+  ## URGH.  need to be able to sort out the stuff that comes BEFORE the warnings
+  admb_warnerr_index <- grepl("warning|error",coutfile)
+  csplit <- split(coutfile,head(c(0,cumsum(admb_warnerr_index)),-1))
+  wchunks <- which(sapply(lapply(csplit,grep,pattern="warning"),length)>0)
+  echunks <- which(sapply(lapply(csplit,grep,pattern="error"),length)>0)
+  if (length(wchunks)>0) {
+    admb_warnings <- paste("from ADMB:",unlist(csplit[wchunks]))
     sapply(admb_warnings,warning)
-    coutfile <- coutfile[-admb_warning_index]
+    csplit <- csplit[-wchunks]
   }
-  cred <- coutfile[!substr(coutfile,1,85) %in%
-                   c("cat: xxalloc4.tmp: No such file or directory",
-                     "cat: xxalloc5.tmp: No such file or directory",
-                     "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
-  if (length(cred)>0)
+  ## HACK for ignorable ADMB-RE error messages: no longer necessary??
+  ## cred <- coutfile[!substr(coutfile,1,85) %in%
+  ##                  c("cat: xxalloc4.tmp: No such file or directory",
+  ##                    "cat: xxalloc5.tmp: No such file or directory",
+  ##                    "Error executing command cat xxglobal.tmp   xxhtop.tmp   header.tmp   xxalloc1.tmp   x")]
+  if (length(echunks)>0 && !ignore_admb_errors)
     stop("errors detected in compilation: run with verbose=TRUE to view")
   ## PART 2B: run executable file
   args <- ""
@@ -232,6 +250,8 @@ do_admb <- function(fn,
     stop("errors detected in run: run with verbose=TRUE to view")
   ## PART 3
   if (verbose) cat("reading output ...\n")
+  parfn <- paste(fn,"par",sep=".")
+  if (!file.exists(parfn)) stop("couldn't find parameter file ",parfn)
   L <- c(list(fn=fn,txt=res),read_pars(fn))
   if (mcmc) {
     if (checkparam!="write") {

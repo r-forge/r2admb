@@ -4,7 +4,7 @@ TOUCH = touch
 REXE = R
 ROPTS = --vanilla
 RCMD = $(REXE) $(ROPTS) CMD
-RSCRIPT = Rscript $(ROPTS)
+RSCRIPT = $(R_HOME)/bin/Rscript $(ROPTS)
 
 CC = gcc
 CXX = g++

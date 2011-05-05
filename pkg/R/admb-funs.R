@@ -144,7 +144,7 @@ print.summary.admb <- function(x,
             na.print = "NA", ...)
 }
 
-stdEr <- function(x, ...) {
+stdEr <- function(object, ...) {
   UseMethod("stdEr")
 }
 
