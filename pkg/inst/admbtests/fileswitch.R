@@ -23,13 +23,13 @@ testfun <- function(fn) {
           checkdata="write",checkparam="write")
 }
 
-
 file.copy("toy1.tpl","toy1_orig.tpl")
 t1 <- testfun("toy1")
-file.copy("toy1.tpl","TOY1.tpl")  ## FALSE if case-insensitive
+file.copy("toy1.tpl","TOY1.tpl")
+t2 <- testfun("TOY1")
+unlink("toy1.tpl")
 t2 <- testfun("TOY1")
 
-if (test_OScase()) unlink("TOY1.tpl")
 ## clean up
 file.copy("toy1_orig.tpl","toy1.tpl",overwrite=TRUE)
 unlink("toy1_orig.tpl")
