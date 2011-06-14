@@ -4,7 +4,7 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
-\section{Changes in version 0.7.1}{ (2010-08-16)}{
+\section{Changes in version 0.7.1 (2010-08-16)}{
   \itemize{
     \item improved warning handling
     \item took out testing for spurious xxalloc error messages

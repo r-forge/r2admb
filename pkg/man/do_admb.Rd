@@ -10,23 +10,17 @@
 do_admb(fn, data, params,
 bounds=NULL,
 phase=NULL,
-re = FALSE,
-re_vectors = NULL,
+re = NULL,
 data_type = NULL,
 safe = TRUE,
 profile = FALSE,
 profpars = NULL,
 mcmc = FALSE,
-mcmc2 = FALSE,
-mcmcsteps = 1000,
-mcmcsave = max(1,round(mcmcsteps/1000)),
-mcmcpars = NULL,
+mcmc.opts = mcmc.control(),
 impsamp = FALSE,
 verbose=FALSE,
 wd=getwd(),
-  checkparam=c("stop","warn","write","ignore"),
-  checkdata=c("stop","warn","write","ignore"),
-write_files=TRUE,
+run.opts=run.control(),
 objfunname="f",
 clean=TRUE,
 ignore_admb_errors=FALSE,
@@ -43,10 +37,8 @@ extra.args)
   \item{bounds}{named list of 2-element vectors of lower and upper
     bounds for specified parameters}
   \item{phase}{named numeric vector of phases (not implemented yet)}
-  \item{re}{(logical) use random effects?
-    \emph{Must be specified in order to use \code{ADMB_RE} models.}}
-  \item{re_vectors}{a named numeric vector of the identities and lengths
-    of any random effects vectors used in the TPL file}
+  \item{re}{a named list of the identities and dimensions
+    of any random effects vectors or matrices used in the TPL file}
   \item{data_type}{a named vector specifying (optional)
     data types for parameters, in parname="storage mode" format
     (e.g. \code{c(x="integer",y="numeric")})}
@@ -54,20 +46,14 @@ extra.args)
   \item{profile}{(logical) generate likelihood profiles? (untested!)}
   \item{profpars}{(character) vector of names of parameters to profile}
   \item{mcmc}{(logical) run MCMC around best fit?}
-  \item{mcmc2}{(logical) run MCMC including random effects (RE only)?}
-  \item{mcmcsteps}{integer) number of MCMC steps to run}
-  \item{mcmcsave}{(integer) number of MCMC steps to save}
-  \item{mcmcpars}{(character) vector of parameters for which to save
-    MCMC output}
+  \item{mcmc.opts}{options for MCMC (see
+    \code{\link{mcmc.control}} for details)}
   \item{impsamp}{(logical) run importance sampling?}
   \item{verbose}{(logical) print details}
   \item{wd}{working directory}
-  \item{checkparam}{result of parameter checks: "stop" to stop with
-    an error when there is any mismatch, "warn" to warn,
-    "write" to attach an appropriate section to the TPL file,
-    and "ignore" to ignore mismatches}
-  \item{checkdata}{result of data checks (as for checkparam)}
-  \item{write_files}{write data/parameter files?}
+  \item{run.opts}{options for ADMB run (see
+    \code{\link{run.control}} for details)
+  }
   \item{objfunname}{(character) name for objective function in TPL file
     (only relevant if \code{checkparam} is set to "write")}
   \item{clean}{remove output and working files when finished}

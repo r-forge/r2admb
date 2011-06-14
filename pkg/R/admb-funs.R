@@ -110,7 +110,7 @@ print.admb <- function(x, verbose=FALSE, ...) {
   print(unlist(x$coefficients))
   if (!is.null(x$mcmc)) {
     mcpar <- attr(x$mcmc,"mcpar")
-    cat("MCMC: start=",mcpar[1],", end=",mcpar[2],", thin=",mcpar[3],"\n")
+    cat("MCMC parameters: start=",mcpar[1],", end=",mcpar[2],", thin=",mcpar[3],"\n",sep="")
   }
   if (verbose) cat(x$txt,sep="\n")
 }      

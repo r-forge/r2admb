@@ -6,7 +6,7 @@ check_section <- function(fn,
                           bounds,
                           data_type,
                           phase,
-                          re_vectors,
+                          re,
                           mcmcpars,
                           profpars,
                           secname,
@@ -167,8 +167,8 @@ check_section <- function(fn,
         } else if (!is.null(dim(x)) && length(dim(x))==2) {
           parstr[i] <- paste("init_imatrix ",n,
                   "(1,",dim(x)[1],",1,",dim(x)[2],")",sep="")
-          partab$dim1 <- dim(x)[1]
-          partab$dim2 <- dim(x)[2]
+          partab$dim1[i] <- dim(x)[1]
+          partab$dim2[i] <- dim(x)[2]
         }
       } else if ((!is.null(data_type) &&
                   n %in% names(data_type)[data_type=="numeric"]) ||
@@ -223,12 +223,19 @@ check_section <- function(fn,
     restr <- mcmcstr <- profstr <- NULL
     if (pars) {
       ## deal with random effects vectors
-      if (!is.null(re_vectors)) {
-        nre <- length(re_vectors)
-        restr <- character(nre)
-        if (is.list(re_vectors)) re_vectors <- unlist(re_vectors)
-        restr <- indent(paste("random_effects_vector ",names(re_vectors),
-                "(1,",re_vectors,")",sep=""))
+      if (!is.null(re)) {
+        redim <- sapply(re,length)
+        re_vectors <- re[redim==1]
+        re_mats <- re[redim==2]
+        restr <- ""
+        if (length(re_vectors)>0)
+          restr <- c(restr,indent(paste("random_effects_vector ",names(re_vectors),
+                                "(1,",re_vectors,")",sep="")))
+        if (length(re_mats)>0)
+          restr <- c(restr,indent(paste("random_effects_matrix ",names(re_mats),
+                                "(1,",
+                                sapply(re_mats,"[",1),",1,",
+                                sapply(re_mats,"[",2),")",sep="")))
       }
       ## FIXME: uuuuuugly! need a better, more consistent way
       ## of handling parameter attributes ...

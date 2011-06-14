@@ -8,7 +8,7 @@ ReedfrogSizepred <-
 setup_admb()
 fn <- "ReedfrogSizepred0"
 tplfile <- paste(fn,"tpl",sep=".")
-file.copy(system.file("inst","tplfiles",tplfile,package="R2admb"),
+file.copy(system.file("tplfiles",tplfile,package="R2admb"),
           tplfile)
 
 m1 <- do_admb(fn,
@@ -17,23 +17,26 @@ m1 <- do_admb(fn,
                 ReedfrogSizepred),
               params=list(c=0.45,d=13,g=1),
               bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
-              checkparam="write",
-              checkdata="write",
-              clean=TRUE)
+              run.opts=run.control(checkparam="write",
+                checkdata="write"))
+
 
 
 m1P <- do_admb(fn,
               data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
                 ReedfrogSizepred),
-              params=list(c=0.45,d=13,g=1),
-              bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
-              checkparam="write",
-              checkdata="write",
-              profile=TRUE,
-              profpars=c("c","d","g"),
-              clean=TRUE)
-
+               params=as.list(coef(m1)),
+##              bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+##                bounds=list(c=c(0.1,1),d=c(5,50),g=c(-1,25)),
+               bounds=list(c=c(0.3,0.6),d=c(10,15),g=c(15,20)),
+               run.opts=run.control(checkparam="write",
+                 checkdata="write"),
+               profile=TRUE,
+               verbose=TRUE,
+              profpars=c("c","d","g"))
+## argh -- must fix this.  don't know where the errors are coming from --
+##  was OK in a previous version
 
 m1MC <- do_admb(fn,
               data=c(list(nobs=nrow(ReedfrogSizepred),
@@ -41,11 +44,10 @@ m1MC <- do_admb(fn,
                 ReedfrogSizepred),
                 params=list(c=0.45,d=13,g=1),
                 bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
-                checkparam="write",
-                checkdata="write",
+                run.opts = run.control(checkparam="write",
+                  checkdata="write"),
                 mcmc=TRUE,
-                mcmcpars=c("c","d","g"),
-                clean=TRUE)
+                mcmc.opts=mcmc.opts(mcmcpars=c("c","d","g")))
 save("m1","m1P","m1MC",file="Reedfrog_runs.RData")
 
 ## clean up
