@@ -8,9 +8,9 @@ DATA_SECTION
 PARAMETER_SECTION
 
   objective_function_value f
-  init_bounded_number c(0,1)
-  init_bounded_number d(0,50)
-  init_bounded_number g(-1,25)
+  init_number c
+  init_number d
+  init_number g
   vector prob(1,nobs)    // per capita mort prob
   sdreport_number r_c
   sdreport_number r_d

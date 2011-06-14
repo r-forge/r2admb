@@ -70,6 +70,7 @@ do_admb <- function(fn,
                     run.opts=run.control(),
                     objfunname="f",
                     clean=TRUE,
+                    workdir=getwd(),
                     ignore_admb_errors=FALSE,
                     extra.args) {
   ## TO DO: check to see if executables are found
@@ -78,6 +79,12 @@ do_admb <- function(fn,
   ##  2. compile (tpl -> rem/cpp -> binary)
   ##  3. run
   ##  4. retrieve & package output
+  if (!missing(workdir)) {
+    file.copy(list.files(pattern=paste(fn,"\\.(dat|pin|tpl)",sep="")),
+              workdir)
+    cwd <- setwd(workdir)
+    on.exit(setwd(cwd))
+  }
   checkparam <- run.opts["checkparam"]
   checkdata <- run.opts["checkdata"]
   if (mcmc) {

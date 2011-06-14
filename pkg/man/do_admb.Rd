@@ -23,6 +23,7 @@ wd=getwd(),
 run.opts=run.control(),
 objfunname="f",
 clean=TRUE,
+workdir=getwd(),
 ignore_admb_errors=FALSE,
 extra.args)
 }
@@ -57,6 +58,7 @@ extra.args)
   \item{objfunname}{(character) name for objective function in TPL file
     (only relevant if \code{checkparam} is set to "write")}
   \item{clean}{remove output and working files when finished}
+  \item{workdir}{temporary working directory (dat/pin/tpl files will be copied)}
   \item{ignore_admb_errors}{what it says: use at your own risk!}
   \item{extra.args}{(character) extra argument string to pass to admb}
 }
