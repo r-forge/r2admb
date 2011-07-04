@@ -1,11 +1,14 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en   "><head>
-<!-- This is the project specific website template --><!-- It can be changed as liked or replaced by other content --><?php $domain=ereg_replace('[^\.]*\.(.*)$','\1',$_SERVER['HTTP_HOST']);
+
+<!-- This is the project specific website template --><!-- It can be changed as liked or replaced by other content --><?php 
+
+$domain=ereg_replace('[^\.]*\.(.*)$','\1',$_SERVER['HTTP_HOST']);
 $group_name=ereg_replace('([^\.]*)\..*$','\1',$_SERVER['HTTP_HOST']);
 $themeroot='http://r-forge.r-project.org/themes/rforge/';
 
-echo '<?xml version="1.0" encoding="UTF-8"?>
-  
+echo '<?xml version="1.0" encoding="UTF-8"?>;
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en   "><head>  
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <title>&lt;?php echo $group_name; ?&gt;</title>
 
@@ -13,9 +16,9 @@ echo '<?xml version="1.0" encoding="UTF-8"?>
   
   <link href="%3C?php%20echo%20$themeroot;%20?%3Estyles/estilo1.css" rel="stylesheet" type="text/css" />
 
-</head><body style="color: rgb(0, 0, 0); background-color: rgb(153, 255, 255);" alink="#000099" link="#000099" vlink="#990099">
-';
-?&gt;<!-- R-Forge Logo -->
+</head>
+<body style="color: rgb(0, 0, 0); background-color: rgb(153, 255, 255);" alink="#000099" link="#000099" vlink="#990099">
+<!-- R-Forge Logo -->
 <table border="0" cellpadding="0" cellspacing="0" width="100%">
 
   <tbody>
