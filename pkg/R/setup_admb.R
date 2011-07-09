@@ -13,16 +13,19 @@ setup_admb <- function(admb_home) {
         ## (2) check that it finds something, (3) try to
         ## use 'default' location??
         admb_home <- suppressWarnings(system("locate bin/admb | grep bin/admb$",intern=TRUE))
-        if (length(admb_home)==0) {
-          admb_home <- ""
-        } else {
+        if (length(admb_home)>0) {
           admb_home <- gsub("/bin/admb$","",admb_home)
+        } else if (file.exists("/usr/local/admb")) {
+          ## try default location
+          admb_home <- "/usr/local/admb"
+        } else {
+          admb_home <- ""
         }
         ## n.b. extra slash at end of ADMB_HOME is **VERY BAD** **VERY CONFUSING**
         ##  provokes weird behavior where "bin/sedd..." turns into "binsedd..." ???
         if (length(admb_home)>1) {
           warning("'locate' found more than one instance of bin/admb: using last")
-          ## FIXME: query user?
+          ## FIXME: query user for which one to use?
           admb_home <- admb_home[length(admb_home)]
         }
       }

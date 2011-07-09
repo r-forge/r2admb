@@ -19,12 +19,10 @@ mcmc = FALSE,
 mcmc.opts = mcmc.control(),
 impsamp = FALSE,
 verbose=FALSE,
-wd=getwd(),
 run.opts=run.control(),
 objfunname="f",
-clean=TRUE,
 workdir=getwd(),
-ignore_admb_errors=FALSE,
+admb_errors=c("stop","warn","ignore"),
 extra.args)
 }
 \arguments{
@@ -51,15 +49,14 @@ extra.args)
     \code{\link{mcmc.control}} for details)}
   \item{impsamp}{(logical) run importance sampling?}
   \item{verbose}{(logical) print details}
-  \item{wd}{working directory}
   \item{run.opts}{options for ADMB run (see
     \code{\link{run.control}} for details)
   }
   \item{objfunname}{(character) name for objective function in TPL file
     (only relevant if \code{checkparam} is set to "write")}
-  \item{clean}{remove output and working files when finished}
   \item{workdir}{temporary working directory (dat/pin/tpl files will be copied)}
-  \item{ignore_admb_errors}{what it says: use at your own risk!}
+  \item{admb_errors}{how to treat ADMB errors (in either compilation or
+    run): use at your own risk!}
   \item{extra.args}{(character) extra argument string to pass to admb}
 }
 \value{

@@ -1,7 +1,7 @@
 Package: R2admb
 Type: Package
 Title: ADMB to R interface functions
-Version: 0.7.1
+Version: 0.7.2
 Date: 2011-05-05
 Author: Ben Bolker, Hans Skaug
 Maintainer: Ben Bolker <bolker@mcmaster.ca>

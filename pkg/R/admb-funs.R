@@ -161,7 +161,8 @@ AIC.admb <- function(object,...,k=2) {
 ## summary() method ...
 ##  save model file with object???
 
-clean_admb <- function(fn,which=c("all","sys","output"),profpars=NULL) {
+clean_admb <- function(fn,which=c("all","sys","output","none"),profpars=NULL) {
+  if (which=="none") return()
   tplfile <- paste(fn,"tpl",sep=".")
   ## need logic here!  enumeration of all files ???
   sys.ext <- c("htp","cpp","o","rep","rhes","bar","eva",

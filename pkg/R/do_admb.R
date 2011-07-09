@@ -8,6 +8,10 @@ run.control <- function(check_tpl=TRUE,
                         clean_files="all") {
    checkparam <- match.arg(checkparam)
    checkdata <- match.arg(checkdata)
+   if (is.logical(clean_files)) {
+     if (clean_files) clean_files <- "all"
+     else clean_files <- "none"
+   }
    c(check_tpl=check_tpl,checkparam=checkparam,checkdata=checkdata,
      write_files=write_files,compile=compile,run=run,read_files=read_files,
      clean_files=clean_files)
@@ -66,12 +70,10 @@ do_admb <- function(fn,
                     mcmc.opts=mcmc.control(),
                     impsamp=FALSE,
                     verbose=FALSE,
-                    wd=getwd(),
                     run.opts=run.control(),
                     objfunname="f",
-                    clean=TRUE,
                     workdir=getwd(),
-                    ignore_admb_errors=FALSE,
+                    admb_errors=c("stop","warn","ignore"),
                     extra.args) {
   ## TO DO: check to see if executables are found
   ## MODULARIZE (separate sub-function):
@@ -79,6 +81,7 @@ do_admb <- function(fn,
   ##  2. compile (tpl -> rem/cpp -> binary)
   ##  3. run
   ##  4. retrieve & package output
+  admb_errors <- match.arg(admb_errors)
   if (!missing(workdir)) {
     file.copy(list.files(pattern=paste(fn,"\\.(dat|pin|tpl)",sep="")),
               workdir)
@@ -250,8 +253,10 @@ do_admb <- function(fn,
           }
           csplit <- csplit[-wchunks]
         }
-    if (length(echunks)>0 && !ignore_admb_errors)
-      stop("errors detected in compilation: run with verbose=TRUE to view")
+    if (length(echunks)>0) {
+      comperrmsg <- "errors detected in compilation: run with verbose=TRUE to view"
+      if (admb_errors=="stop") stop(comperrmsg) else if (admb_errors=="warn") warning(comperrmsg)
+    }
   }
   ## PART 2B: run executable file
   if (run.opts["run"]) {
@@ -271,8 +276,10 @@ do_admb <- function(fn,
       cat("Run output:\n",res,"\n",sep="\n")
       cat(outfile,"\n",sep="\n")
     }
-    if (length(grep("^Error",outfile)>0))
-      stop("errors detected in run: run with verbose=TRUE to view")
+    if (length(grep("^Error",outfile)>0)) {
+      runerrmsg <- "errors detected in ADMB run: run with verbose=TRUE to view"
+      if (admb_errors=="stop") stop(runerrmsg) else if (admb_errors=="warn") warning(runerrmsg)
+    }
   }
   if (run.opts["read_files"]) {
     ## PART 3
