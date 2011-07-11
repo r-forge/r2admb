@@ -4,6 +4,11 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.2}{
+  \itemize{
+    \item exposed and documented read_pars, write_pin, write_dat
+}}
+
 \section{Changes in version 0.7.1 (2010-08-16)}{
   \itemize{
     \item improved warning handling

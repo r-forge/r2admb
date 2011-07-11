@@ -9,6 +9,13 @@ numfmt <- function(x,len=length(x)) {
         sep="")
 }
 
+rep_pars <- function(parnames) {
+  parnames <- unlist(lapply(split(parnames,factor(parnames)),
+                            function(x) {
+                              if (length(x)==1) x else numfmt(x)
+                            }))
+}
+
 read_pars <- function (fn) {
   ## see
   ##  http://admb-project.org/community/admb-meeting-march-29-31/InterfacingADMBwithR.pdf
@@ -38,7 +45,7 @@ read_pars <- function (fn) {
   parlen <- count.fields(paste(fn,".par",sep=""))
   parnames <- gsub("^# +","",gsub(":$","",tmp2[parlines]))
   parnames <- unname(unlist(mapply(function(x,len) {
-    if (len==1) x else paste(x,1:len,sep=".")
+    if (len==1) x else numfmt(x,len)  ## paste(x,1:len,sep=".")
   },
                                    parnames,parlen)))
   est <- unlist(par_dat)
@@ -63,10 +70,7 @@ read_pars <- function (fn) {
     cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
     parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
     if (any(duplicated(parnames))) {
-      parnames <- unlist(lapply(split(parnames,factor(parnames)),
-                                function(x) {
-                                  if (length(x)==1) x else numfmt(x)
-                                }))
+      parnames <- rep_pars(parnames)
     }
     std <- sd_dat[1:npar, 4]
     vcov <- outer(std,std) * cormat
@@ -162,6 +166,7 @@ AIC.admb <- function(object,...,k=2) {
 ##  save model file with object???
 
 clean_admb <- function(fn,which=c("all","sys","output","none"),profpars=NULL) {
+  which <- match.arg(which)
   if (which=="none") return()
   tplfile <- paste(fn,"tpl",sep=".")
   ## need logic here!  enumeration of all files ???
@@ -369,7 +374,8 @@ proc_var <- function(s,drop.first=TRUE,maxlen) {
   ## drop LOCAL CALCS sections
   calclocs <- grep("_CALCS *$",s)
   if (length(calclocs)>0) {
-    droplines <- unlist(apply(matrix(-calclocs,nrow=2,byrow=TRUE),1,function(x) x[1]:x[2]))
+    droplines <- unlist(apply(matrix(-calclocs,
+                                     ncol=2,byrow=TRUE),1,function(x) seq(x[1],x[2])))
     s <- s[droplines]
   }
   ## strip comments & whitespace
@@ -501,7 +507,7 @@ read_admbbin <- function(fn) {
 }
          
 ## from glmmADMB, by Hans Skaug
-"dat_write" <-
+write_dat <- "dat_write" <-
 function (name, L) 
 {
     n <- nchar(name)
@@ -525,7 +531,7 @@ function (name, L)
   }
 
 ## from glmmADMB, by Hans Skaug
-"pin_write" <-
+write_pin <- "pin_write" <-
 function (name, L) 
 {
     n <- nchar(name)

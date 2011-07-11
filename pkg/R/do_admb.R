@@ -312,6 +312,7 @@ do_admb <- function(fn,
   ## cover both cases
   ## FIXME: check -- why is this here? it's "on.exit" -- can't it go earlier?
   if (!run.opts["clean_files"]=="none") {
+    ## FIXME: why both versions?
     on.exit(clean_admb(fn,run.opts["clean_files"]),add=TRUE)
     on.exit(clean_admb(fn,run.opts["clean_files"],profpars),add=TRUE)
   }
