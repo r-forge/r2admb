@@ -78,7 +78,7 @@ do_admb <- function(fn,
   ## TO DO: check to see if executables are found
   ## MODULARIZE (separate sub-function):
   ##  1. check or construct input&data files, optionally write TPL file
-  ##  2. compile (tpl -> rem/cpp -> binary)
+  ##  2. compile (tpl -> rem/cpp -> binary)  [DONE]
   ##  3. run
   ##  4. retrieve & package output
   admb_errors <- match.arg(admb_errors)
@@ -94,7 +94,8 @@ do_admb <- function(fn,
     if (checkparam=="write" && !"mcmcpars" %in% names(mcmc.opts))
       stop("must specify mcmcpars when checkparam=='write' and mcmc is TRUE")
   }
-  if (profile && missing(profpars) && checkparam=="write") stop("must specify profpars when checkparam=='write' and profile is TRUE")
+  if (profile && missing(profpars) && checkparam=="write")
+    stop("must specify profpars when checkparam=='write' and profile is TRUE")
   if (!profile && !missing(profpars)) stop("profpars specified but profile is FALSE")
   if (is.null(re)) {
     if (mcmc && "mcmc2" %in% names(mcmc.opts)) stop("mcmc2 can only be used with random-effects models")
@@ -225,97 +226,27 @@ do_admb <- function(fn,
   ## insert check(s) for failure at this point
   ## PART 2A: compile
   if (run.opts["compile"]) {
-    test <- try(system("admb",intern=TRUE))
-    if (inherits(test,"try-error")) stop("base admb command failed: run setup_admb(), or check ADMB installation")
-    args <- ""
-    if (!is.null(re)) args <- "-r"
-    if (safe) args <- paste(args,"-s")
-    if (verbose) cat("compiling with args: '",args,"' ...\n")
-    res0 <- system(paste("admb",args,fn," 2>",paste(fn,".cout",sep="")),
-                   intern=TRUE)
-    coutfile <- readLines(paste(fn,".cout",sep=""))
-    if (verbose) {
-      cat("compile output:\n",res0,"\n")
-      cat("compile log:\n")
-      cat(coutfile,sep="\n")
-    }
-    ## sorting out the lines that come BEFORE the warnings
-    admb_warnerr_index <- grepl("warning|error",coutfile)
-    csplit <- split(coutfile,head(c(0,cumsum(admb_warnerr_index)),-1))
-    wchunks <- which(sapply(lapply(csplit,grep,pattern="warning"),length)>0)
-    echunks <- which(sapply(lapply(csplit,grep,pattern="error"),length)>0)
-    if (length(wchunks)>0) {
-          if (!verbose) {
-            ## figure we don't need these warnings
-            ## if we are spitting them out above anyway
-            admb_warnings <- paste("from ADMB:",unlist(csplit[wchunks]))
-            sapply(admb_warnings,warning)
-          }
-          csplit <- csplit[-wchunks]
-        }
-    if (length(echunks)>0) {
-      comperrmsg <- "errors detected in compilation: run with verbose=TRUE to view"
-      if (admb_errors=="stop") stop(comperrmsg) else if (admb_errors=="warn") warning(comperrmsg)
-    }
+    compile_admb(fn,safe,re,verbose)
   }
   ## PART 2B: run executable file
   if (run.opts["run"]) {
-    args <- ""
-    if (mcmc) {
-      args <- paste(args,mcmc.args(mcmc.opts))
-    }
-    if (profile) args <- paste(args,"-lprof")
-    if (!missing(extra.args)) {
-      args <- paste(args,extra.args)
-    }
-    if (verbose) cat("running compiled executable with args: '",args,"'...\n")
-    res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
-    outfile <- readLines(paste(fn,".out",sep=""))
-    ## replace empty res with <empty> ?
-    if (verbose) {
-      cat("Run output:\n",res,"\n",sep="\n")
-      cat(outfile,"\n",sep="\n")
-    }
-    if (length(grep("^Error",outfile)>0)) {
-      runerrmsg <- "errors detected in ADMB run: run with verbose=TRUE to view"
-      if (admb_errors=="stop") stop(runerrmsg) else if (admb_errors=="warn") warning(runerrmsg)
-    }
-  }
+    res <- run_admb(fn,verbose,mcmc,mcmc.opts,profile,extra.args,admb_errors)
+  } else res <- NULL
   if (run.opts["read_files"]) {
+    ## pnames <- get_names(c(mcmc.opts[["mcmcpars"]],names(re)),
+    ## tpldat$info)
     ## PART 3
-    if (verbose) cat("reading output ...\n")
-    parfn <- paste(fn,"par",sep=".")
-    if (!file.exists(parfn)) stop("couldn't find parameter file ",parfn)
-    L <- c(list(fn=fn,txt=res),read_pars(fn))
-    if (mcmc) {
-      if (checkparam!="write") {
-        warning("MCMC naming is probably wrong")
-      }
-      pnames <- get_names(c(mcmc.opts[["mcmcpars"]],names(re)),
-                          tpldat$info)
-      L <- c(L,list(hist=read_hst(fn)))
-      if (mcmc.opts[["mcsave"]]>0) {
-        L$mcmc <- read_psv(fn,names=pnames)
-        ## FIXME: account for mcmc2 if appropriate
-        attr(L$mcmc,"mcpar") <- c(1,mcmc.opts[["mcmc"]],mcmc.opts[["mcsave"]])
-      }
-      ## FIXME: if TPL file is user-written we need to recover
-      ## the *order* of mcmc pars somehow?
-    }
-    if (profile) {
-      L$prof <- lapply(paste("p_",profpars,sep=""),read_plt)
-      names(L$prof) <- profpars
-    }
-    class(L) <- "admb"
+    ## FIXME: we should be able to recover info about prof and MCMC par names from
+    ##  somewhere ... re-read TPL files etc.?
+    L <- read_admb(fn,verbose,
+                   profile,
+                   mcmc,
+                   admbOut=res)
   }
   ## need to do this **AFTER** auto-generated versions get swapped around
   ## cover both cases
   ## FIXME: check -- why is this here? it's "on.exit" -- can't it go earlier?
-  if (!run.opts["clean_files"]=="none") {
-    ## FIXME: why both versions?
-    on.exit(clean_admb(fn,run.opts["clean_files"]),add=TRUE)
-    on.exit(clean_admb(fn,run.opts["clean_files"],profpars),add=TRUE)
-  }
+  on.exit(clean_admb(fn,run.opts["clean_files"]),add=TRUE)
   ## check for NA/NaN in logLik, errors in text?
   if (run.opts["read_files"]) L else NULL
 }

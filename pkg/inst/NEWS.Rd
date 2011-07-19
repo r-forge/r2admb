@@ -4,6 +4,15 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.3}{
+  \itemize{
+    \item major changes to modularity: exposed compile_admb, run_admb,
+    read_admb
+    \item changes to clean_admb
+    \item improved logic for retrieving profile and MCMC parameter names
+  in read_admb; run_admb writes .mcinfo file to disk
+}}
+
 \section{Changes in version 0.7.2}{
   \itemize{
     \item exposed and documented read_pars, write_pin, write_dat

@@ -165,33 +165,27 @@ AIC.admb <- function(object,...,k=2) {
 ## summary() method ...
 ##  save model file with object???
 
-clean_admb <- function(fn,which=c("all","sys","output","none"),profpars=NULL) {
-  which <- match.arg(which)
-  if (which=="none") return()
-  tplfile <- paste(fn,"tpl",sep=".")
-  ## need logic here!  enumeration of all files ???
-  sys.ext <- c("htp","cpp","o","rep","rhes","bar","eva",
-               "bgs","ecm","luu","mc2","mcm","tpl.bak")
+clean_admb <- function(fn,which=c("sys","output")) {
+  if (length(which)==1) {
+    if (which=="none") return()
+    if (which=="all") which <- c("sys","input","output")
+  }
+  
+  sys.ext <- c("bar","bgs","cpp","ecm","eva","htp","luu","mc2","mcm","o","rep","rhes",
+               "luu","mc2","mcm","tpl.bak","out","cout")
+  sys.files <- paste(fn,sys.ext,sep=".")
+  sys.other <- c("eigv.rpt","fmin.log","variance","sims",
+                 "hesscheck","hessian.bin","dgs2","diags",
+                 paste("admodel",c("dep","hes","cov"),sep="."))
+  ## FIXME: clean up abandoned 'buffer' files too
   input.ext <- c("pin","dat")
-  output.ext <- c("log","cor","std", "par","psv","hst","prf")
-  sys2.ext <- c("out","cout")
-  other <- c("eigv.rpt","fmin.log","variance","sims",
-             "hesscheck","hessian.bin","dgs2","diags",
-             paste("admodel",c("dep","hes","cov"),sep="."))
-  which <- match.arg(which)
-  if (which=="all") {
-    ## erase only targeted extensions -- NOT everything with the basename except the tpl file
-    delfiles <-  paste(fn,c(sys.ext,input.ext,output.ext,sys2.ext),sep=".")
-    ## list.files(pattern=paste("^",fn,"\\..*",sep=""))
-    ##    delfiles <- setdiff(delfiles,tplfile)
-    delfiles <- c(delfiles,other)
-    if (!is.null(profpars)) {
-      delfiles <- c(delfiles,paste(profpars,".plt",sep=""))
-    }
-  } else {
-    stop("only 'all' option is currently implemented")
-  } 
-  unlink(delfiles)
+  input.files <- paste(fn,input.ext,sep=".")
+  output.ext <- c("log","cor","std", "par","psv","hst","prf","mcinfo")
+  output.files <- paste(fn,output.ext,sep=".")
+  output.files <- c(output.files,list.files(pattern="\\.plt$"))
+  if ("sys" %in% which) unlink(c(sys.files,sys.other))
+  if ("input" %in% which) unlink(input.files)
+  if ("output" %in% which) unlink(output.files)
 }
 
 ## @rm -vf $(PROGRAM_NAME){.htp,.cpp,.std,.rep,.b??,.p??,.r??,.cor,.eva,.log,.rhes,.luu,}
@@ -599,3 +593,126 @@ confint.admb <- function(object, parm, level=0.95, method="default", ...) {
     }
   }
 }
+
+compile_admb <- function(fn,safe=FALSE,re=NULL,verbose=FALSE,
+                         admb_errors=c("stop","warn","ignore")) {
+  admb_errors <- match.arg(admb_errors)
+  if (!file.exists(paste(fn,"tpl",sep="."))) stop("can't find TPL file")
+  test <- try(system("admb",intern=TRUE))
+  if (inherits(test,"try-error")) stop("base admb command failed: run setup_admb(), or check ADMB installation")
+  args <- ""
+  if (!is.null(re)) args <- "-r"
+  if (safe) args <- paste(args,"-s")
+  if (verbose) cat("compiling with args: '",args,"' ...\n")
+  res0 <- system(paste("admb",args,fn," 2>",paste(fn,".cout",sep="")),
+                 intern=TRUE)
+  coutfile <- readLines(paste(fn,".cout",sep=""))
+  if (verbose) {
+    cat("compile output:\n",res0,"\n")
+    cat("compile log:\n")
+    cat(coutfile,sep="\n")
+  }
+  ## sorting out the lines that come BEFORE the warnings
+  admb_warnerr_index <- grepl("warning|error",coutfile)
+  csplit <- split(coutfile,head(c(0,cumsum(admb_warnerr_index)),-1))
+  wchunks <- which(sapply(lapply(csplit,grep,pattern="warning"),length)>0)
+  echunks <- which(sapply(lapply(csplit,grep,pattern="error"),length)>0)
+  if (length(wchunks)>0) {
+    if (!verbose) {
+      ## figure we don't need these warnings
+      ## if we are spitting them out above anyway
+      admb_warnings <- paste("from ADMB:",unlist(csplit[wchunks]))
+      sapply(admb_warnings,warning)
+    }
+    csplit <- csplit[-wchunks]
+  }
+  Sys.chmod(fn,mode="0755")
+  if (length(echunks)>0) {
+    comperrmsg <- "errors detected in compilation: run with verbose=TRUE to view"
+    if (admb_errors=="stop") stop(comperrmsg) else if (admb_errors=="warn") warning(comperrmsg)
+  }
+}
+
+run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),profile=FALSE,extra.args="",
+                     admb_errors=c("stop","warn","ignore")) {
+  admb_errors <- match.arg(admb_errors)
+  args <- ""
+  if (mcmc) {
+    args <- paste(args,mcmc.args(mcmc.opts))
+  }
+  if (profile) args <- paste(args,"-lprof")
+  if (!missing(extra.args)) {
+    args <- paste(args,extra.args)
+  }
+  if (verbose) cat("running compiled executable with args: '",args,"'...\n")
+  res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
+  outfile <- readLines(paste(fn,".out",sep=""))
+  ## replace empty res with <empty> ?
+  if (mcmc) {
+    ## write MC info to disk so it will be retrievable ...
+    mcinfofile <- file(paste(fn,"mcinfo",sep="."),"w")
+    mctab <- unlist(mapply(function(x,y) {
+      c(paste("# ",x),if (is.null(y))  "" else paste(y,collapse=" "))
+    },names(mcmc.opts),mcmc.opts))
+    writeLines(mctab,paste(fn,"mcinfo",sep="."))
+  }
+  if (verbose) {
+    cat("Run output:\n",res,"\n",sep="\n")
+    cat(outfile,"\n",sep="\n")
+  }
+  if (length(grep("^Error",outfile)>0)) {
+    runerrmsg <- "errors detected in ADMB run: run with verbose=TRUE to view"
+    if (admb_errors=="stop") stop(runerrmsg) else if (admb_errors=="warn") warning(runerrmsg)
+  }
+  invisible(res)
+}
+
+read_admb <- function(fn,verbose=FALSE,
+                      profile=FALSE,
+                      mcmc=FALSE,
+                      mcmc.opts=NULL,
+                      admbOut=NULL) {
+  tpldat <- read_tpl(fn)  ## extract info from TPL file
+  if (verbose) cat("reading output ...\n")
+  parfn <- paste(fn,"par",sep=".")
+  if (!file.exists(parfn)) stop("couldn't find parameter file ",parfn)
+  L <- c(list(fn=fn,txt=admbOut),read_pars(fn))
+  if (mcmc) {
+    ## if (checkparam!="write") {
+    ## warning("MCMC naming is probably wrong")
+    ## }
+    ## FIXME: get MCMC names -- how?
+    L <- c(L,list(hist=read_hst(fn)))
+    if (is.null(mcmc.opts)) {
+      ## try to retrieve mc info from file
+      mcinfofile <- paste(fn,"mcinfo",sep=".")
+      if (file.exists(mcinfofile)) {
+        w <- readLines(mcinfofile)
+        wnames <- gsub("^# +","",w[seq(1,length(w),by=2)])
+        wvals <- as.list(w[seq(2,length(w),by=2)])
+        wvals[c(1,2,5)] <- as.numeric(wvals[c(1,2,5)])
+        wvals[3:4] <- as.logical(wvals[3:4])
+        wvals[[6]] <- strsplit(wvals[[6]]," ")[[1]]
+        names(wvals) <- wnames
+        mcmc.opts <- wvals
+      } else warning("having difficulty retrieving MCMC info, will try to continue anyway")
+    }
+    if (is.null(mcmc.opts) || is.null(mcmc.opts$mcmcpars) || nchar(mcmc.opts$mcmcpars)==0) {
+      pnames <- gsub("r_","",tpldat$info$sdnums$vname)
+    } else pnames <- mcmc.opts$mcmcpars
+    if (is.null(mcmc.opts) || mcmc.opts[["mcsave"]]>0) {
+      L$mcmc <- read_psv(fn,names=pnames)
+      ## FIXME: account for mcmc2 if appropriate
+      attr(L$mcmc,"mcpar") <- c(1,mcmc.opts[["mcmc"]],mcmc.opts[["mcsave"]])
+    }
+  }
+  if (profile) {
+    profpars <- tpldat$info$profparms$vname
+    L$prof <- lapply(profpars,read_plt)
+    names(L$prof) <- gsub("p_","",profpars)  ## FIXME: maybe dangerous?
+  }
+  class(L) <- "admb"
+  L
+}
+
+
