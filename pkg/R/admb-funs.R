@@ -10,6 +10,7 @@ numfmt <- function(x,len=length(x)) {
 }
 
 rep_pars <- function(parnames) {
+  parnames <- as.character(parnames)
   parnames <- unlist(lapply(split(parnames,factor(parnames)),
                             function(x) {
                               if (length(x)==1) x else numfmt(x)
@@ -59,6 +60,7 @@ read_pars <- function (fn) {
     cormat <- vcov <- matrix(NA,nrow=npar,ncol=npar)
     std <- rep(NA,npar)
   } else {
+    nsdpar <- nrow(sd_dat)
     ## need col.names hack so read.table knows how many
     ##  columns to read: ?read.table, "Details"
     ncorpar <- length(readLines(paste(fn,"cor",sep=".")))-2
@@ -66,18 +68,21 @@ read_pars <- function (fn) {
                   as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
     ## drop cors that are not parameters
     ## (have dropped mc parameters)
-    cormat <- as.matrix(cor_dat[1:npar,4+(1:npar)])
+    cormat <- as.matrix(cor_dat[1:nsdpar,4+(1:nsdpar)])
     cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
-    parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
+    parnames <- sd_dat[,2]
+    ## parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
     if (any(duplicated(parnames))) {
       parnames <- rep_pars(parnames)
     }
-    std <- sd_dat[1:npar, 4]
+    std <- sd_dat[, 4]
     vcov <- outer(std,std) * cormat
   }
   names(std) <- rownames(vcov) <- rownames(cormat) <-
     colnames(vcov) <- colnames(cormat) <- parnames
-  list(coefficients=est, se=std, loglik=-loglik, maxgrad=-maxgrad, cor=cormat, vcov=vcov)
+  list(coefficients=c(est,sd_dat[-(1:npar),3]),
+       se=std, loglik=-loglik, maxgrad=-maxgrad, cor=cormat, vcov=vcov,
+       npar=npar)
 }
 
 str_contains <- function(x,y) {
@@ -111,7 +116,8 @@ print.admb <- function(x, verbose=FALSE, ...) {
   }
   cat("Negative log-likelihood:",-x$loglik,"\n")
   cat("Coefficients:\n")
-  print(unlist(x$coefficients))
+  print(coef(x))
+  ## FIXME: indicate extra parameters?
   if (!is.null(x$mcmc)) {
     mcpar <- attr(x$mcmc,"mcpar")
     cat("MCMC parameters: start=",mcpar[1],", end=",mcpar[2],", thin=",mcpar[3],"\n",sep="")
@@ -152,10 +158,32 @@ stdEr <- function(object, ...) {
   UseMethod("stdEr")
 }
 
-coef.admb <- function(object,...) object$coefficients
+coef.admb <- function(object,type=c("par","extra","all"),...) {
+  type <- match.arg(type)
+  n <- object$npar
+  x <- object$coefficients
+  switch(type,par=x[1:n],
+         extra=x[-(1:n)],
+         all=x)
+}
 logLik.admb <- function(object,...) object$loglik
-vcov.admb <- function(object,...) object$vcov
-stdEr.admb <- function(object,...) sqrt(diag(object$vcov))
+vcov.admb <- function(object,type=c("par","extra","all"),...) {
+  type <- match.arg(type)
+  n <- object$npar
+  v <- object$vcov
+  switch(type,par=v[1:n,1:n],
+         extra=v[-(1:n),-(1:n)],
+         all=v)
+}
+stdEr.admb <- function(object,type=c("par","extra","all"),...) {
+  type <- match.arg(type)  
+  n <- object$npar
+  s <- sqrt(diag(object$vcov))
+  switch(type,par=s[1:n],
+         extra=s[-(1:n)],
+         all=s)
+}
+
 deviance.admb <- function(object,...) -2*object$loglik
 AIC.admb <- function(object,...,k=2) {
   if (length(list(...))>0) stop("multi-object AIC not yet implemented")
@@ -168,16 +196,20 @@ AIC.admb <- function(object,...,k=2) {
 clean_admb <- function(fn,which=c("sys","output")) {
   if (length(which)==1) {
     if (which=="none") return()
-    if (which=="all") which <- c("sys","input","output")
+    if (which=="all") which <- c("sys","input","output","gen")
   }
   
   sys.ext <- c("bar","bgs","cpp","ecm","eva","htp","luu","mc2","mcm","o","rep","rhes",
                "luu","mc2","mcm","tpl.bak","out","cout")
   sys.files <- paste(fn,sys.ext,sep=".")
+  gen.files <- list.files(pattern="_gen(\\.tpl)*")
   sys.other <- c("eigv.rpt","fmin.log","variance","sims",
                  "hesscheck","hessian.bin","dgs2","diags",
-                 paste("admodel",c("dep","hes","cov"),sep="."))
+                 paste("admodel",c("dep","hes","cov"),sep="."),
+                 list.files(pattern="xx.*.tmp"),
+                 list.files(pattern=".*f1b2list.*"))
   ## FIXME: clean up abandoned 'buffer' files too
+  ## f1b2list etc.
   input.ext <- c("pin","dat")
   input.files <- paste(fn,input.ext,sep=".")
   output.ext <- c("log","cor","std", "par","psv","hst","prf","mcinfo")
@@ -186,6 +218,7 @@ clean_admb <- function(fn,which=c("sys","output")) {
   if ("sys" %in% which) unlink(c(sys.files,sys.other))
   if ("input" %in% which) unlink(input.files)
   if ("output" %in% which) unlink(output.files)
+  if ("gen" %in% which) unlink(gen.files)
 }
 
 ## @rm -vf $(PROGRAM_NAME){.htp,.cpp,.std,.rep,.b??,.p??,.r??,.cor,.eva,.log,.rhes,.luu,}
@@ -455,6 +488,11 @@ read_psv <- function(f,names=NULL) {
   fn <- paste(f,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
   ans <- read_admbbin(fn)
+  if (is.null(names)) names <- paste("V",seq(ncol(ans)),sep="")
+  if (length(names)!=ncol(ans)) {
+    warning("mismatch between number of columns and number of names")
+    names <- c(names,paste("V",seq(length(names)+1,ncol(ans)),sep=""))
+  }
   colnames(ans) <- names
   ans <- as.data.frame(ans)
   ans
@@ -697,9 +735,12 @@ read_admb <- function(fn,verbose=FALSE,
         mcmc.opts <- wvals
       } else warning("having difficulty retrieving MCMC info, will try to continue anyway")
     }
-    if (is.null(mcmc.opts) || is.null(mcmc.opts$mcmcpars) || nchar(mcmc.opts$mcmcpars)==0) {
-      pnames <- gsub("r_","",tpldat$info$sdnums$vname)
-    } else pnames <- mcmc.opts$mcmcpars
+    ## if (is.null(mcmc.opts) || is.null(mcmc.opts$mcmcpars) || nchar(mcmc.opts$mcmcpars)==0) {
+    ## pnames <- gsub("r_","",tpldat$info$sdnums$vname)
+    ## } else pnames <- mcmc.opts$mcmcpars
+    sdinfo <- read.table(paste(fn,"std",sep="."),skip=1)
+    pnames <- rep_pars(sdinfo[,2])
+    pnames <- grep("^r_.*",pnames,value=TRUE,invert=TRUE)
     if (is.null(mcmc.opts) || mcmc.opts[["mcsave"]]>0) {
       L$mcmc <- read_psv(fn,names=pnames)
       ## FIXME: account for mcmc2 if appropriate

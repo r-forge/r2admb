@@ -17,14 +17,16 @@
 \method{AIC}{admb}(object, \dots, k = 2)
 \method{logLik}{admb}(object, \dots)
 \method{deviance}{admb}(object, \dots)
-\method{vcov}{admb}(object, \dots)
-\method{coef}{admb}(object,\dots)
-\method{stdEr}{admb}(object,\dots)
+\method{vcov}{admb}(object, type=c("par","extra","all"),\dots)
+\method{coef}{admb}(object,type=c("par","extra","all"),\dots)
+\method{stdEr}{admb}(object,type=c("par","extra","all"),\dots)
 stdEr(object,\dots)
 }
 \arguments{
   \item{object}{an ADMB model fit (of class "admb")}
   \item{k}{penalty value for AIC fits}
+  \item{type}{which type of parameters report. "par": parameters only;
+    "extra": sdreport variables; "all": both}
   \item{\dots}{other parameters (for S3 generic compatibility)}
 }
 \value{
