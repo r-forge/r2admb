@@ -11,7 +11,18 @@ m1 <- do_admb("ReedfrogSizepred0",
               params=list(c=0.45,d=13,g=1),
               run.opts=run.control(checkparam="write",
                 checkdata="write"),
-              clean=TRUE)
+              verbose=TRUE)
+m1P <- do_admb("ReedfrogSizepred0",
+              data=c(list(nobs=nrow(ReedfrogSizepred),
+                nexposed=rep(10,nrow(ReedfrogSizepred))),
+                ReedfrogSizepred),
+               params=list(c=0.45,d=13,g=1),
+               profile=TRUE,
+               profpars=c("c","d","g"),
+               run.opts=run.control(checkparam="write",
+                 checkdata="write"),
+               admb_errors="warn",  ## because of Hessian problem
+               verbose=TRUE)
 m1MC <- do_admb("ReedfrogSizepred0",
               data=c(list(nobs=nrow(ReedfrogSizepred),
                 nexposed=rep(10,nrow(ReedfrogSizepred))),
@@ -21,8 +32,7 @@ m1MC <- do_admb("ReedfrogSizepred0",
                   checkdata="write"),
                 mcmc=TRUE,
                 mcmc.opts=mcmc.control(mcmcpars=c("c","d","g")),
-                clean=TRUE,verbose=TRUE)
-unlink(c("reedfrogsizepred0.tpl",
-       "reedfrogsizepred0"))
-save("m1","m1MC",file="Reedfrog_runs.RData")
+                verbose=TRUE)
+unlink("reedfrogsizepred0")
+save("m1","m1MC","m1P",file="Reedfrog_runs.RData")
 

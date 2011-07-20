@@ -451,7 +451,7 @@ Only a few new things to note here:
   
 See the ADMB-RE manual (\url{http://admb-project.googlecode.com/files/admb-re.pdf}) for more detail.
 
-<<echo=FALSE>>=
+<<loadtoy1,echo=FALSE>>=
 load("toy1_runs.RData")
 @ 
 
@@ -464,22 +464,21 @@ argument to specify the names and lengths of each of the random effects vectors 
 <<fakerun2,eval=FALSE>>=
 d1 <- do_admb("toy1",
               data=tmpdat,
-              re=TRUE,
               params=list(beta=rep(0,ncol(X)),sigma_herd=0.1),
               bounds=list(sigma_herd=c(0.0001,20)),
-              re_vectors=list(u_herd=ncol(Zherd)),
+              re=list(u_herd=ncol(Zherd)),
               run.opts=run.control(checkdata="write",checkparam="write"),
               mcmc=TRUE,
-              mcmc.opts=mcmc.control(mcmcpars=c("beta","sigma_herd")))
+              mcmc.opts=mcmc.control(mcmc=20,mcmcpars=c("beta","sigma_herd")))
 @ 
 
 Comparing \code{glmer} and \code{R2admb} results:
 
-<<>>=
+<<coefsumlmer>>=
 coef(summary(gm1))
 @ 
 
-<<>>=
+<<coefsumadmb>>=
 coef(summary(d1))[1:5,]
 @ 
 (The full table would include the estimates of the random effects as well.)
@@ -488,7 +487,7 @@ Confirm that the random effects estimates are the same (note that the
 ADMB estimates are not scaled by the estimated standard deviation, so
 we do that by hand).
 
-<<fig=TRUE>>=
+<<ranefsfig=TRUE>>=
 plot(ranef(gm1)$herd[,1],coef(d1)[6:20]*coef(d1)["sigma_herd"],
      xlab="glmer estimate",ylab="ADMB estimate")
 abline(a=0,b=1)

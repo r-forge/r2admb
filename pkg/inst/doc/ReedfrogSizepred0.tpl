@@ -1,5 +1,4 @@
 PARAMETER_SECTION
-
   vector prob(1,nobs)    // per capita mort prob
 
 PROCEDURE_SECTION
