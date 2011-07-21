@@ -160,8 +160,9 @@ stdEr <- function(object, ...) {
 
 coef.admb <- function(object,type=c("par","extra","all"),...) {
   type <- match.arg(type)
-  n <- object$npar
   x <- object$coefficients
+  n <- object$npar
+  if (is.null(n)) n <- length(x)
   switch(type,par=x[1:n],
          extra=x[-(1:n)],
          all=x)
@@ -169,16 +170,17 @@ coef.admb <- function(object,type=c("par","extra","all"),...) {
 logLik.admb <- function(object,...) object$loglik
 vcov.admb <- function(object,type=c("par","extra","all"),...) {
   type <- match.arg(type)
-  n <- object$npar
   v <- object$vcov
+  n <- object$npar
+  if (is.null(n)) n <- ncol(v)
   switch(type,par=v[1:n,1:n],
          extra=v[-(1:n),-(1:n)],
          all=v)
 }
 stdEr.admb <- function(object,type=c("par","extra","all"),...) {
   type <- match.arg(type)  
-  n <- object$npar
   s <- sqrt(diag(object$vcov))
+  n <- object$npar
   switch(type,par=s[1:n],
          extra=s[-(1:n)],
          all=s)
