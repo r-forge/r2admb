@@ -3,6 +3,7 @@
 \alias{vcov.admb}
 \alias{logLik.admb}
 \alias{coef.admb}
+\alias{confint.admb}
 \alias{deviance.admb}
 \alias{stdEr}
 \alias{stdEr.admb}
@@ -20,6 +21,7 @@
 \method{vcov}{admb}(object, type=c("par","extra","all"),\dots)
 \method{coef}{admb}(object,type=c("par","extra","all"),\dots)
 \method{stdEr}{admb}(object,type=c("par","extra","all"),\dots)
+\method{confint}{admb}(object,parm, level=0.95, method="default", \dots)
 stdEr(object,\dots)
 }
 \arguments{
@@ -27,6 +29,13 @@ stdEr(object,\dots)
   \item{k}{penalty value for AIC fits}
   \item{type}{which type of parameters report. "par": parameters only;
     "extra": sdreport variables; "all": both}
+  \item{parm}{ (currently ignored: FIXME) select parameters}
+  \item{level}{alpha level for confidence interval}
+  \item{method}{(character): "default" or "quad", quadratic (Wald)
+    intervals based on approximate standard errors; "profile", profile
+    CIs (if profile was computed); "quantile", CIs based on quantiles of
+    the MCMC-generated posterior density (if MCMC was computed);
+    "HPDinterval", CIs based on highest posterior density (ditto)}
   \item{\dots}{other parameters (for S3 generic compatibility)}
 }
 \value{

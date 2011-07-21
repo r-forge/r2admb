@@ -552,16 +552,21 @@ function (name, L)
         date(), "\n", file = file_name, sep = "")
     for (i in 1:length(L)) {
         x <- L[[i]]
-        if (data.class(x) == "numeric") 
-            cat("#", names(L)[i], "\n", L[[i]], "\n\n", file = file_name, 
-                append = TRUE)
-        if (data.class(x) == "matrix") {
+        dc <- data.class(x)
+        if (dc=="numeric") {
+          cat("#", names(L)[i], "\n", L[[i]], "\n\n", file = file_name, 
+              append = TRUE)
+        } else {
+          if (data.class(x) == "matrix") {
             cat("#", names(L)[i], "\n", file = file_name, append = TRUE)
             write.table(L[[i]], , col = FALSE, row = FALSE, quote = FALSE, 
-                file = file_name, append = TRUE)
+                        file = file_name, append = TRUE)
             cat("\n", file = file_name, append = TRUE)
+          } else {
+            stop(paste("can't handle data type '",dc,"' (variable ",names(L)[i],")",sep=""))
+          }
         }
-    }
+      }
   }
 
 ## from glmmADMB, by Hans Skaug
