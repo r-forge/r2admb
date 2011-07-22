@@ -11,7 +11,7 @@ numfmt <- function(x,len=length(x)) {
 
 rep_pars <- function(parnames) {
   parnames <- as.character(parnames)
-  parnames <- unlist(lapply(split(parnames,factor(parnames)),
+  parnames <- unlist(lapply(split(parnames,factor(parnames,levels=unique(parnames))),
                             function(x) {
                               if (length(x)==1) x else numfmt(x)
                             }))
@@ -209,7 +209,8 @@ clean_admb <- function(fn,which=c("sys","output")) {
                  "hesscheck","hessian.bin","dgs2","diags",
                  paste("admodel",c("dep","hes","cov"),sep="."),
                  list.files(pattern="xx.*.tmp"),
-                 list.files(pattern=".*f1b2list.*"))
+                 list.files(pattern=".*f1b2list.*"),
+                 list.files(pattern=paste(fn,"\\.[bpr][0-9]+",sep="")))
   ## FIXME: clean up abandoned 'buffer' files too
   ## f1b2list etc.
   input.ext <- c("pin","dat")

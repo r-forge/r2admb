@@ -13,7 +13,9 @@
     in read_admb; run_admb writes .mcinfo file to disk
     \item write_dat complains if class is not matrix or factor
     \item exposed confint.admb
-    \item read_pars reads full std matrix (attempt at back-compatibility)
+    \item read_pars reads full std matrix (attempt at
+    back-compatibility) [and fixed bug]
+    
 }}
 
 \section{Changes in version 0.7.2}{
