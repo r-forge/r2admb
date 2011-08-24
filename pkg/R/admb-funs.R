@@ -21,6 +21,7 @@ read_pars <- function (fn) {
   ## see
   ##  http://admb-project.org/community/admb-meeting-march-29-31/InterfacingADMBwithR.pdf
   ## for an alternate file reader -- does this have equivalent functionality?
+  ## FIXME: get hessian.bin ?
   rt <- function(f,ext,...) {
     fn <- paste(f,ext,sep=".")
     if (file.exists(fn)) read.table(fn,...) else NA
@@ -78,6 +79,9 @@ read_pars <- function (fn) {
     std <- sd_dat[, 4]
     vcov <- outer(std,std) * cormat
   }
+  ## hes <- read_admbbin("admodel.hes")
+  ## FIXME: can read this, but I don't know what it means!
+  ##  it doesn't seem to be the raw Hessian ...
   names(std) <- rownames(vcov) <- rownames(cormat) <-
     colnames(vcov) <- colnames(cormat) <- parnames
   list(coefficients=c(est,sd_dat[-(1:npar),3]),
@@ -202,7 +206,7 @@ clean_admb <- function(fn,which=c("sys","output")) {
   }
   
   sys.ext <- c("bar","bgs","cpp","ecm","eva","htp","luu","mc2","mcm","o","rep","rhes",
-               "luu","mc2","mcm","tpl.bak","out","cout")
+               "luu","mc2","mcm","tpl.bak","out","cout","shess")
   sys.files <- paste(fn,sys.ext,sep=".")
   gen.files <- list.files(pattern="_gen(\\.tpl)*")
   sys.other <- c("eigv.rpt","fmin.log","variance","sims",
@@ -531,6 +535,7 @@ read_plt <- function(varname) {
 ## read a "standard" ADMB format binary file into R:
 ##  standard format is: 1 integer describing number
 ##  of (double) values per vector
+## FIXME: check bin sizes 
 read_admbbin <- function(fn) {
   f <- file(fn,open="rb")
   nv <- readBin(f,"int")
@@ -717,7 +722,8 @@ read_admb <- function(fn,verbose=FALSE,
                       profile=FALSE,
                       mcmc=FALSE,
                       mcmc.opts=NULL,
-                      admbOut=NULL) {
+                      admbOut=NULL,
+                      checkterm=TRUE) {
   tpldat <- read_tpl(fn)  ## extract info from TPL file
   if (verbose) cat("reading output ...\n")
   parfn <- paste(fn,"par",sep=".")
@@ -748,7 +754,9 @@ read_admb <- function(fn,verbose=FALSE,
     ## } else pnames <- mcmc.opts$mcmcpars
     sdinfo <- read.table(paste(fn,"std",sep="."),skip=1)
     pnames <- rep_pars(sdinfo[,2])
-    pnames <- grep("^r_.*",pnames,value=TRUE,invert=TRUE)
+    ## pnames <- grep("^r_.*",pnames,value=TRUE,invert=TRUE)
+    sdreportvars <- as.character(tpldat$info$sdnums$vname)
+    pnames <- setdiff(pnames,sdreportvars)
     if (is.null(mcmc.opts) || mcmc.opts[["mcsave"]]>0) {
       L$mcmc <- read_psv(fn,names=pnames)
       ## FIXME: account for mcmc2 if appropriate
@@ -759,6 +767,13 @@ read_admb <- function(fn,verbose=FALSE,
     profpars <- tpldat$info$profparms$vname
     L$prof <- lapply(profpars,read_plt)
     names(L$prof) <- gsub("p_","",profpars)  ## FIXME: maybe dangerous?
+  }
+  ## compute termination criteria
+  ##  can we retrieve hessian directly???
+  if (checkterm) {
+    v <- with(L,vcov[seq(npar),seq(npar)])
+    ev <- try(eigen(solve(v))$value)
+    L$eratio <- if (inherits(ev,"try-error")) NA else min(ev)/max(ev)
   }
   class(L) <- "admb"
   L
