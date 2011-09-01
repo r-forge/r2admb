@@ -39,7 +39,8 @@ setup_admb <- function(admb_home) {
   }
   Sys.setenv(ADMB_HOME=admb_home)
   path=Sys.getenv("PATH")
+  pathsepchr <- if (.Platform$OS.type=="windows") ";" else ":"
   Sys.setenv(PATH=paste(path,paste(admb_home,"bin",sep="/"),
-               sep=":"))
+               sep=pathsepchr))
   admb_home
 }

@@ -696,7 +696,12 @@ run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),profil
     args <- paste(args,extra.args)
   }
   if (verbose) cat("running compiled executable with args: '",args,"'...\n")
-  res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
+  
+  if (.Platform$OS.type=="windows") 
+    res <- shell(paste(fn,".exe ",args," >", fn,".out",sep=""),intern=TRUE)
+  else  
+    res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
+    
   outfile <- readLines(paste(fn,".out",sep=""))
   ## replace empty res with <empty> ?
   if (mcmc) {
