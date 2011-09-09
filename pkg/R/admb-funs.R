@@ -463,6 +463,8 @@ read_tpl <- function(f) {
   splsec_proc <- lapply(splsec,drop_calcs)
   L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
+  ## EXPERIMENTAL:
+  pp <- pp[!grepl("^ *!!"),pp]
   if (!is.null(pp)) {
       pp <- proc_var(pp,maxlen=7)
       type <- 1 ## kluge for R CMD check warnings; will be masked
