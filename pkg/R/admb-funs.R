@@ -645,14 +645,14 @@ confint.admb <- function(object, parm, level=0.95, method="default", ...) {
   }
 }
 
-compile_admb <- function(fn,safe=FALSE,re=NULL,verbose=FALSE,
+compile_admb <- function(fn,safe=FALSE,re=FALSE,verbose=FALSE,
                          admb_errors=c("stop","warn","ignore")) {
   admb_errors <- match.arg(admb_errors)
   if (!file.exists(paste(fn,"tpl",sep="."))) stop("can't find TPL file")
   test <- try(system("admb",intern=TRUE))
   if (inherits(test,"try-error")) stop("base admb command failed: run setup_admb(), or check ADMB installation")
   args <- ""
-  if (!is.null(re)) args <- "-r"
+  if (re) args <- "-r"
   if (safe) args <- paste(args,"-s")
   if (verbose) cat("compiling with args: '",args,"' ...\n")
   res0 <- system(paste("admb",args,fn," 2>",paste(fn,".cout",sep="")),
@@ -684,11 +684,13 @@ compile_admb <- function(fn,safe=FALSE,re=NULL,verbose=FALSE,
   }
 }
 
-run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),profile=FALSE,extra.args="",
+run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),
+                     profile=FALSE,extra.args="",
                      admb_errors=c("stop","warn","ignore")) {
   admb_errors <- match.arg(admb_errors)
   args <- ""
   if (mcmc) {
+    if (is.null(mcmcpars)) stop("you must specify at least one parameter in 'mcmcpars' (see ?mcmc.control)")
     args <- paste(args,mcmc.args(mcmc.opts))
   }
   if (profile) args <- paste(args,"-lprof")
@@ -739,7 +741,9 @@ read_admb <- function(fn,verbose=FALSE,
     ## warning("MCMC naming is probably wrong")
     ## }
     ## FIXME: get MCMC names -- how?
-    L <- c(L,list(hist=read_hst(fn)))
+    if (file.exists(paste(fn,"hst",sep=".")) {
+      L <- c(L,list(hist=read_hst(fn)))
+    }
     if (is.null(mcmc.opts)) {
       ## try to retrieve mc info from file
       mcinfofile <- paste(fn,"mcinfo",sep=".")
@@ -769,6 +773,9 @@ read_admb <- function(fn,verbose=FALSE,
     }
   }
   if (profile) {
+    if (!is.null(tpldat$info$raneff)) {
+      stop("something's wrong -- profiling is not implemented for random effects models")
+    }
     profpars <- tpldat$info$profparms$vname
     L$prof <- lapply(profpars,read_plt)
     names(L$prof) <- gsub("p_","",profpars)  ## FIXME: maybe dangerous?

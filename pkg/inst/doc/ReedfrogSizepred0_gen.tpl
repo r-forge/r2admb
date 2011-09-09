@@ -12,9 +12,6 @@ PARAMETER_SECTION
   init_number d
   init_number g
   vector prob(1,nobs)    // per capita mort prob
-  sdreport_number r_c
-  sdreport_number r_d
-  sdreport_number r_g
 PROCEDURE_SECTION
 
   dvariable fpen=0.0;         // penalty variable
@@ -29,6 +26,3 @@ PROCEDURE_SECTION
   f -= sum( log_comb(nexposed,Kill)+
             elem_prod(Kill,log(prob))+
             elem_prod(nexposed-Kill,log(1-prob)));
-  r_c=c;
-  r_d=d;
-  r_g=g;

@@ -43,11 +43,12 @@ To an R user, however, ADMB represents a challenge. The first (unavoidable) chal
 The \code{R2admb} package can be installed in R in the
 standard way (with \code{install.packages()} or via a Packages menu,
 depending on your platorm: at the moment,
-since it's on the development platform r-forge, you'll have
-to say
+since it's on the development platform \href{http://r-forge.r-project.org}{R-forge}, you'll have
+to use
 <<eval=FALSE>>=
 install.packages("R2admb",repos="http://r-forge.r-project.org")
 @ 
+to install it.
 You can also download the file and use \code{R CMD INSTALL} from
 the command line.
 
@@ -56,8 +57,6 @@ However, you'll also need to install ADMB: see one of the following links:
 \begin{itemize}
 \item \url{http://admb-project.org/}
 \item \url{http://admb-project.org/downloads}
-\item \url{http://code.google.com/p/admb-project/}
-\item \url{http://code.google.com/p/admb-project/downloads/list}
 \end{itemize}
 
 You may also need to install a C++ compiler (in particular, the
@@ -65,18 +64,47 @@ MacOS installation instructions will probably ask you
 to install gcc/g++ from the Xcode package).
 You will need to have the scripts \code{admb}, \code{adcomp},
 and \code{adlink} in the \code{bin} directory of your
-ADMB installation (I hope this Just Works once you have installed ADMB, but there's a chance that things will have to be tweaked).
+ADMB installation (I hope this Just Works once you have installed ADMB, 
+but there's a chance that things will have to be tweaked).
 
 \section{Quick start (for the impatient)}
 
+\subsection{For non-ADMB users}
 \begin{enumerate}
 \item Write the function that computes your negative log-likelihood
   function (see the ADMB manual, or below, for examples) and save
   it in a file with extension \code{.tpl} (hereafter ``the TPL file'') in your working directory.
 \item run \code{setup\_admb()} to set up your ADMB environment appropriately.
-\item run \code{do\_admb(fn,data,params)}, where \code{fn} is the base name (without extension) of your TPL file, \code{data} is a list of the input data, and \code{params} is a list of the starting parameter values; if you want R to generate the PARAMETERS and DATA section of your TPL file automatically, use \code{do\_admb(fn,data,params,checkparam="write",checkdata="write")}. Save the results as an R object.
-\item use the standard R model accessor methods (\code{coef}, \code{summary}, \code{vcov}, \code{logLik}, \code{AIC}) to explore the results.
+\item run \code{do\_admb(fn,data,params)}, where \code{fn} is the base name (without extension) of your TPL file, \code{data} is a list of the input data, and \code{params} is a list of the starting parameter values; if you want R to generate the PARAMETERS and DATA section of your TPL file automatically, use 
+<<eval=FALSE>>=
+do_admb(fn,data,params,
+        run.opts=run.control(checkparam="write",checkdata="write"))
+@ 
+Assign the result to an R object.
+\item use the standard R model accessor methods (\code{coef}, \code{summary}, \code{vcov}, \code{logLik}, \code{AIC} (etc.)) 
+  to explore the results.
 \end{enumerate}
+
+\subsection{For ADMB users}
+If you are already familiar with ADMB (e.g. you already have your TPL files written with
+appropriate PARAMETERS and DATA sections), or if you prefer a more granular approach to
+controlling ADMB (for example, if you are going to compile a TPL file once and then
+run it for lots of different sets of input parameters), you can instead use \code{R2admb}
+as follows:
+\begin{enumerate}
+\item Write your TPL file, set up your input and data files.
+\item \code{setup\_admb()} as above.
+\item \code{compile\_admb(fn)} to compile your TPL file,
+  specifying \code{re=TRUE} if the model has random effects
+  (or do this outside R)
+\item \code{run\_admb(fn)} to run the executable
+\item \code{results <- read\_admb(fn)} to read (and save) the results
+\item \code{clean\_admb(fn)} to clean up the files that have been generated
+\item as before,
+  use the standard R model accessor methods
+  to explore the results.
+\end{enumerate}
+There are more steps this way, but you have a bit more control of the process.
   
 \section{Basics}
 
@@ -200,14 +228,21 @@ AD Model Builder binaries and libraries on
 our system; and run \verb+do_admb+ with appropriate
 arguments.
 
-<<admbfit_fake,eval=FALSE>>=
+<<eval=FALSE>>=
 setup_admb()
+@ 
+<<>>=
+rfs_params <- list(c=0.45,d=13,g=1) ## starting parameters
+rfs_bounds <- list(c=c(0,1),d=c(0,50),g=c(-1,25)) ## bounds
+rfs_dat <- c(list(nobs=nrow(ReedfrogSizepred),
+                  nexposed=rep(10,nrow(ReedfrogSizepred))),
+             ReedfrogSizepred)
+@ 
+<<admbfit_fake,eval=FALSE>>=
 m1 <- do_admb("ReedfrogSizepred0",
-              data=c(list(nobs=nrow(ReedfrogSizepred),
-                nexposed=rep(10,nrow(ReedfrogSizepred))),
-                ReedfrogSizepred),
-              params=list(c=0.45,d=13,g=1),
-              bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+              data=rfs_dat,
+              params=rfs_params,
+              bounds=rfs_bounds,
               run.opts=run.control(checkparam="write",
                 checkdata="write"))
 unlink(c("reedfrogsizepred0.tpl",
@@ -243,8 +278,9 @@ m1
 <<coef>>=
 coef(m1)
 @
-\item Get a coefficient table including standard errors and (approximate!!)
-  $p$ values:
+\item Get a coefficient table including standard errors and $p$ values.
+  (The $p$ values provided are from a Wald test, which is based on an assumption
+  that the log-likelihood surface is quadratic.  Use them with caution.)
 <<summary>>=
 summary(m1)
 @ 
@@ -274,8 +310,8 @@ m1P <- do_admb("ReedfrogSizepred0",
                data=c(list(nobs=nrow(ReedfrogSizepred),
                  nexposed=rep(10,nrow(ReedfrogSizepred))),
                  ReedfrogSizepred),
-               params=list(c=0.45,d=13,g=1),
-               bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+               params=rfs_params,
+               bounds=rfs_bounds,
                run.opts=run.control(checkparam="write",
                  checkdata="write"),
                profile=TRUE,
@@ -339,15 +375,14 @@ for complex models (high-dimensional or containing random effects)
 where likelihood profiling becomes problematic.
 
 To use MCMC, just add \code{mcmc=TRUE} and specify the parameters
-you want to keep track of with \code{mcmcpars}:
+for which you want histograms [see below] via \code{mcmcpars} (you must
+specify at least one).
 
 <<admbfakemc,eval=FALSE>>=
-m1MC <- do_admb("ReedfrogSizepred",
-              data=c(list(nobs=nrow(ReedfrogSizepred),
-                nexposed=rep(10,nrow(ReedfrogSizepred))),
-                ReedfrogSizepred),
-                params=list(c=0.45,d=13,g=1),
-                bounds=list(c=c(0,1),d=c(0,50),g=c(-1,25)),
+m1MC <- do_admb("ReedfrogSizepred0",
+              data=rfs_dat,
+                params=rfs_params,
+                bounds=rfs_bounds,
                 run.opts=run.control(checkparam="write",
                   checkdata="write"),
                 mcmc=TRUE,
@@ -361,41 +396,85 @@ unlink(c("reedfrogsizepred0.tpl",
 The output of MCMC is stored in two ways. 
 
 (1) ADMB internally computes a histogram of the MCMC sampled
-density; this is stored in a list element called \verb+$hist+,
-as an object of class \code{admb\_hist}.  It has its own plot method:
+densities, for \code{sdreport} parameters only (if you don't
+know what these are, that's OK --- appropriate parameters 
+are auto-generated when you specify \code{mcmcpars}).
+This information is stored in a list element called \verb+$hist+,
+as an object of class \code{admb\_hist}.  
 
-<<fig=TRUE>>=
+It has its own plot method:
+<<mchistplot,fig=TRUE>>=
 print(plot(m1MC$hist))
 @ 
 
-(2) Alternatively, the full set of samples is stored (as
-a data frame) in list element \verb+$mcmc+.  If you load
+(2) In addition the full set of samples, sampled as
+frequently as specified in \code{mcsave} (by default,
+the values are sampled at a frequency that gives a total
+of 1000 samples for the full run) is stored as
+a data frame in list element \verb+$mcmc+.  If you load
 the \code{coda} package, you can convert this into an object
 of class \code{mcmc}, and then use the various methods
 implemented in \code{coda} to analyze it.
-
 
 <<>>=
 library(coda)
 mmc <- as.mcmc(m1MC$mcmc)
 @ 
 
+Trace plots give a graphical diagnostic of the behavior
+of the MCMC chain.  In this case the diagnostics are
+\emph{not} good --- you should be looking for traces
+that essentially look like white noise.
+<<mctraceplot,fig=TRUE>>=
+print(xyplot(mmc))
+@ 
+(for larger sets of parameters you may want to specify
+a layout other than the default 1-row-by-$n$-columns,
+e.g. \code{xyplot(mmc,layout=c(2,2))}).
+
+If you want a numerical summary of the chain behavior
+you can use \code{raftery.diag} or \code{geweke.diag}
+(the most common diagnostic, the Gelman-Rubin statistic
+(\code{gelman.diag}) doesn't work here because it requires
+multiple chains and ADMB only runs a single chain):
+<<>>=
+raftery.diag(mmc)
+geweke.diag(mmc)
+@ 
+<<echo=FALSE>>=
+gd <- geweke.diag(mmc)
+gd1 <- gd[["z"]][1]
+@ 
+\code{geweke.diag} returns $Z$ scores for the
+equality of (by default) the first 10\% and the
+last 50\% of the chain.  For example, the
+value of \Sexpr{round(gd1,3)} here is slightly
+high: \code{pnorm(abs(v),lower.tail=FALSE)*2} computes
+a two-tailed $Z$-test (with $p$ value
+\Sexpr{round(pnorm(abs(gd1),lower.tail=FALSE)*2,3)}
+in this case).
+
+You can also compute the effective size of the
+sample, i.e. corrected for autocorrelation:
+<<>>=
+effectiveSize(mmc)
+@ 
+This value should be at least 100, and probably
+greater than 200, for reasonable estimation of
+confidence intervals. 
+
 Highest posterior density (i.e. Bayesian credible) intervals:
 <<>>=
 HPDinterval(mmc)
 @ 
 
-Density plots:
-<<fig=TRUE>>=
+Density plots show you the estimated posterior density of the variables:
+<<mcdensplot,fig=TRUE>>=
 print(densityplot(mmc))
 @ 
 
-Trace plots:
-<<fig=TRUE>>=
-print(xyplot(mmc))
-@ 
-
-See the documentation for the \code{coda} package.
+See the documentation for the \code{coda} package for
+more information about these methods.
 (You don't need to use \code{print} to see these plots in 
 an interactive session --- it's just required for generating documents.)
 
@@ -472,6 +551,17 @@ d1 <- do_admb("toy1",
               mcmc.opts=mcmc.control(mcmc=20,mcmcpars=c("beta","sigma_herd")))
 @ 
 
+<<testprofinput,echo=FALSE,eval=FALSE>>=
+do_admb("toy1", data=tmpdat,
+        params=list(beta=rep(0,ncol(X)),sigma_herd=0.1),
+        bounds=list(sigma_herd=c(0.0001,20)),
+        re=list(u_herd=ncol(Zherd)),
+        run.opts=run.control(checkdata="write",checkparam="write",
+          clean=FALSE))
+run_admb("toy1_gen",profile=TRUE)
+read_admb("toy1_gen",profile=TRUE)
+@ 
+
 Comparing \code{glmer} and \code{R2admb} results:
 
 <<coefsumlmer>>=
@@ -487,7 +577,7 @@ Confirm that the random effects estimates are the same (note that the
 ADMB estimates are not scaled by the estimated standard deviation, so
 we do that by hand).
 
-<<ranefsfig=TRUE>>=
+<<ranefs,fig=TRUE>>=
 plot(ranef(gm1)$herd[,1],coef(d1)[6:20]*coef(d1)["sigma_herd"],
      xlab="glmer estimate",ylab="ADMB estimate")
 abline(a=0,b=1)

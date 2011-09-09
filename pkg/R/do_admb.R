@@ -94,6 +94,9 @@ do_admb <- function(fn,
     if (checkparam=="write" && !"mcmcpars" %in% names(mcmc.opts))
       stop("must specify mcmcpars when checkparam=='write' and mcmc is TRUE")
   }
+  if (profile & !is.null(re)) {
+    stop("profiling is not implemented for models with random effects")
+  }
   if (profile && missing(profpars) && checkparam=="write")
     stop("must specify profpars when checkparam=='write' and profile is TRUE")
   if (!profile && !missing(profpars)) stop("profpars specified but profile is FALSE")
@@ -145,12 +148,13 @@ do_admb <- function(fn,
     ## modifications to PROCEDURE section:
     ## need to assign MCMC reporting variables
     if (mcmc) {
-      
       mcmcparnames <- gsub("^ +sdreport_(number|vector) r_","",
                            gsub("\\(.*$","",
                                 dmsg[grep("^ +sdreport",dmsg)]))
-      tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
-                                      indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
+      if (length(mcmcparnames)>0) {
+        tpldat$secs$PROCEDURE <- append(tpldat$secs$PROCEDURE,
+                                        indent(paste("r_",mcmcparnames,"=",mcmcparnames,";",sep="")))
+      }
     }
     if (profile) {
       profparnames <- gsub("^ +likeprof_number p_","",
@@ -226,7 +230,7 @@ do_admb <- function(fn,
   ## insert check(s) for failure at this point
   ## PART 2A: compile
   if (run.opts["compile"]) {
-    compile_admb(fn,safe,re,verbose)
+    compile_admb(fn,safe,re=!is.null(re),verbose)
   }
   ## PART 2B: run executable file
   if (run.opts["run"]) {

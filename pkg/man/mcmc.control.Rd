@@ -20,24 +20,41 @@ FALSE, mcmult = 1, mcmcpars=NULL)
     MCMC2 steps (see ADMB-RE manual)
   }
   \item{mcsave}{
-    Thinning interval.  Default is \code{pmax(1,floor(mcmc/1000))},
+    Thinning interval for values saved in the PSV file.
+    Default is \code{pmax(1,floor(mcmc/1000))},
     i.e. aim to save 1000 steps 
   }
   \item{mcnoscale}{
-    
+    don’t rescale step size for mcmc depending on acceptance rate
   }
   \item{mcgrope}{
-    
-}
+    (double) Use a candidate distribution that is a mixture
+    of a multivariate normal and a fatter-tailed distribution with a
+    proportion \code{mcmcgrope} of the fatter-tailed distribution;
+    the ADMB manual suggests values of \code{mcgrope} between 0.05 and
+    0.1
+  }
   \item{mcmult}{
-    
+    Multiplier for the MCMC candidate distribution
   }
   \item{mcmcpars}{
-
+    (character) vector of parameters to track in MCMC run.
+    \emph{At least one must be specified.}
+    ADMB produces two kinds of output for MCMC.
+    For any \code{sdreport} parameters it
+    will produce a \code{hst} file that contains a summary histogram;
+    \code{mcmcpars} constructs appropriate \code{sdreport} parameters in
+    the auto-generated TPL file.
+    Step-by-step output for all parameters
+    (regulated by \code{mcsave}) is saved in the \code{PSV} file.
   }
 }
 \details{
-  See the AD Model Builder reference manual
+  See the AD Model Builder reference manual. The \code{mcrb} option
+  (reduce correlation of the Hessian when constructing the
+  candidate distribution) and the \code{mcseed} options (seed
+  for random number generator) are not yet implemented; \code{mcnoscale} above
+  may not work properly
 }
 \value{
   Returns a list of options suitable for passing as the \code{mcmc.opts}
