@@ -645,6 +645,7 @@ confint.admb <- function(object, parm, level=0.95, method="default", ...) {
       colnames(tab) <- paste(c((1-level)/2,(1+level)/2)*100,"%")
     }
   }
+  tab
 }
 
 compile_admb <- function(fn,safe=FALSE,re=FALSE,verbose=FALSE,
@@ -743,7 +744,7 @@ read_admb <- function(fn,verbose=FALSE,
     ## warning("MCMC naming is probably wrong")
     ## }
     ## FIXME: get MCMC names -- how?
-    if (file.exists(paste(fn,"hst",sep=".")) {
+    if (file.exists(paste(fn,"hst",sep="."))) {
       L <- c(L,list(hist=read_hst(fn)))
     }
     if (is.null(mcmc.opts)) {

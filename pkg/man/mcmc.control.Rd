@@ -25,7 +25,7 @@ FALSE, mcmult = 1, mcmcpars=NULL)
     i.e. aim to save 1000 steps 
   }
   \item{mcnoscale}{
-    don’t rescale step size for mcmc depending on acceptance rate
+    don't rescale step size for mcmc depending on acceptance rate
   }
   \item{mcgrope}{
     (double) Use a candidate distribution that is a mixture
