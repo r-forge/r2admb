@@ -3,10 +3,20 @@ indent <- function(str,n=2) {
 }
 
 ## format numbers equal width with leading zeros if necessary
-numfmt <- function(x,len=length(x)) {
+numfmt <- function(x,len=length(x),sep=".") {
   paste(x,
         formatC(seq(len),width=format.info(seq(len)),flag="0"),
-        sep="")
+        sep=sep)
+}
+
+numfmt2 <- function(x,xdim,sep=".",sep2=".") {
+  ff1 <- format.info(seq(xdim[1]))
+  ff2 <- format.info(seq(xdim[2]))
+  paste(x,
+        outer(seq(xdim[1]),seq(xdim[2]),
+              function(i,j) paste(formatC(i,width=format.info(ff1),flag="0"),
+                                  formatC(j,width=format.info(ff2),flag="0"),sep=sep2)),
+        sep=sep)
 }
 
 rep_pars <- function(parnames) {
@@ -32,9 +42,8 @@ read_pars <- function (fn) {
                               comment.char=comment.char,
                               quiet=TRUE,...) else NA
   }
-  ## parameter estimates
+  ## get parameter estimates
   par_dat <- rs(fn,"par", skip = 1)
-  npar <- length(par_dat)
   tmp <- rs(fn, "par", what = "", comment.char="")
   ## COULD get parnames out of par file, but a big nuisance
   ##  for vectors etc.
@@ -44,12 +53,46 @@ read_pars <- function (fn) {
   ## second pass to extract names from par file (ugh)
   tmp2 <- readLines(paste(fn,".par",sep=""))
   parlines <- grep("^#",tmp2)[-1]
+  npar <- length(par_dat)      ## TOTAL number of numeric values
+  npar2 <- length(parlines)  ## number of distinct parameters
   parlen <- count.fields(paste(fn,".par",sep=""))
+  parlen2 <- count.fields(paste(fn,".par",sep=""),comment.char="")
   parnames <- gsub("^# +","",gsub(":$","",tmp2[parlines]))
-  parnames <- unname(unlist(mapply(function(x,len) {
-    if (len==1) x else numfmt(x,len)  ## paste(x,1:len,sep=".")
-  },
-                                   parnames,parlen)))
+  parlist <- vector("list",npar2)
+  parnameslist <- vector("list",npar2)
+  names(parlist) <- parnames
+  cumpar <- 1
+  cumline <- 1
+  ## browser()
+  pp <- c(parlines,length(tmp2)+1)
+  for (i in seq(npar2)) {
+    nrows <- diff(pp)[i]-1
+    curlines <- cumline:(cumline+nrows-1)
+    curlen <- sum(parlen[curlines])
+    parvals <- par_dat[cumpar:(cumpar+curlen-1)]
+    if (nrows==1) {
+      if (curlen==1) {
+        parnameslist[[i]] <- parnames[i]
+      } else {
+        parnameslist[[i]] <- numfmt(parnames[i],curlen)
+      }
+      parlist[[i]] <- parvals
+    } else {
+      parlist[[i]] <- matrix(parvals,nrow=nrows,byrow=TRUE)
+      parnameslist[[i]] <- numfmt2(parnames[i],dim(parlist[[i]]))
+    }
+    ## cat(parnames[i],cumline,cumline+nrows-1,cumpar,cumpar+curlen-1,parnameslist[[i]],"\n")
+    ## print(parlist[[i]])
+    cumline <- cumline + nrows
+    cumpar <- cumpar + curlen
+  }
+  ## FIXME: watch out, 'short param names' has now been overwritten by 'long param names'
+  parnames <- unlist(parnameslist)
+  
+  ## parnames <- unname(unlist(mapply(function(x,len) {
+  ## if (len==1) x else numfmt(x,len)  ## paste(x,1:len,sep=".")
+  ##},
+  ## parnames,parlen)))
   est <- unlist(par_dat)
   names(est) <- parnames
   if (!is.finite(loglik)) warning("bad log-likelihood: fitting problem in ADMB?")
@@ -60,6 +103,7 @@ read_pars <- function (fn) {
     warning("std file missing: some problem with fit, but retrieving parameter estimates anyway")
     cormat <- vcov <- matrix(NA,nrow=npar,ncol=npar)
     std <- rep(NA,npar)
+    sdrptvals <- numeric(0)
   } else {
     nsdpar <- nrow(sd_dat)
     ## need col.names hack so read.table knows how many
@@ -77,6 +121,7 @@ read_pars <- function (fn) {
       parnames <- rep_pars(parnames)
     }
     std <- sd_dat[, 4]
+    sdrptvals <- sd_dat[-(1:npar),3]
     vcov <- outer(std,std) * cormat
   }
   ## hes <- read_admbbin("admodel.hes")
@@ -84,7 +129,8 @@ read_pars <- function (fn) {
   ##  it doesn't seem to be the raw Hessian ...
   names(std) <- rownames(vcov) <- rownames(cormat) <-
     colnames(vcov) <- colnames(cormat) <- parnames
-  list(coefficients=c(est,sd_dat[-(1:npar),3]),
+  list(coefficients=c(est,sdrptvals),
+       coeflist=parlist,
        se=std, loglik=-loglik, maxgrad=-maxgrad, cor=cormat, vcov=vcov,
        npar=npar)
 }
@@ -464,7 +510,7 @@ read_tpl <- function(f) {
   L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
   ## EXPERIMENTAL:
-  pp <- pp[!grepl("^ *!!"),pp]
+  pp <- pp[!grepl("^ *!!",pp)]
   if (!is.null(pp)) {
       pp <- proc_var(pp,maxlen=7)
       type <- 1 ## kluge for R CMD check warnings; will be masked
@@ -693,7 +739,7 @@ run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),
   admb_errors <- match.arg(admb_errors)
   args <- ""
   if (mcmc) {
-    if (is.null(mcmcpars)) stop("you must specify at least one parameter in 'mcmcpars' (see ?mcmc.control)")
+    if (is.null(mcmc.opts$mcmcpars)) stop("you must specify at least one parameter in 'mcmc.opts$mcmcpars' (see ?mcmc.control)")
     args <- paste(args,mcmc.args(mcmc.opts))
   }
   if (profile) args <- paste(args,"-lprof")
