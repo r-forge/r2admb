@@ -669,7 +669,7 @@ if (FALSE) {
 ## confint.default works
 confint.admb <- function(object, parm, level=0.95, method="default", ...) {
   if (method %in% c("default","quad")) {
-    confint.default(object)
+    tab <- confint.default(object)
   } else if (method=="profile") {
     vals <- object[["prof"]]
     if (is.null(vals)) stop("model not fitted with profile=TRUE")
