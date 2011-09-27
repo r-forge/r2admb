@@ -833,7 +833,7 @@ read_admb <- function(fn,verbose=FALSE,
   ##  can we retrieve hessian directly???
   if (checkterm) {
     v <- with(L,vcov[seq(npar),seq(npar)])
-    ev <- try(eigen(solve(v))$value)
+    ev <- try(eigen(solve(v))$value,silent=TRUE)
     L$eratio <- if (inherits(ev,"try-error")) NA else min(ev)/max(ev)
   }
   class(L) <- "admb"
