@@ -4,6 +4,7 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+
 \section{Changes in version 0.7.4}{
   \itemize{
     \item major changes to modularity: exposed compile_admb, run_admb,
@@ -15,6 +16,7 @@
     \item exposed confint.admb
     \item read_pars reads full std matrix (attempt at
     back-compatibility) [and fixed bug]
+    \item fixed bug: std err/estimate names mismatch
     
 }}
 

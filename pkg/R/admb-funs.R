@@ -108,6 +108,7 @@ read_pars <- function (fn) {
     nsdpar <- nrow(sd_dat)
     ## need col.names hack so read.table knows how many
     ##  columns to read: ?read.table, "Details"
+    ## FIXME: go gracefully if .cor missing?
     ncorpar <- length(readLines(paste(fn,"cor",sep=".")))-2
     cor_dat <- rt(fn,"cor", skip = 2, fill=TRUE, 
                   as.is=TRUE,col.names=paste("X",1:(4+ncorpar),sep=""))
@@ -115,7 +116,8 @@ read_pars <- function (fn) {
     ## (have dropped mc parameters)
     cormat <- as.matrix(cor_dat[1:nsdpar,4+(1:nsdpar)])
     cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
-    parnames <- sd_dat[,2]
+    ## FIXME ...
+    parnames <- c(parnames,sd_dat[-seq_along(parnames),2])
     ## parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
     if (any(duplicated(parnames))) {
       parnames <- rep_pars(parnames)
