@@ -25,6 +25,7 @@ rep_pars <- function(parnames) {
                             function(x) {
                               if (length(x)==1) x else numfmt(x)
                             }))
+  parnames
 }
 
 read_pars <- function (fn) {
@@ -593,6 +594,7 @@ read_admbbin <- function(fn) {
   isize <- 4; dsize <- 8
   m <- matrix(readBin(f,"double",n=(fs-isize)/dsize),byrow=TRUE,
          ncol=nv)
+  close(f)
   m
 }
          

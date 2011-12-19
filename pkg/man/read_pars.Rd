@@ -1,4 +1,5 @@
 \name{read_pars}
+\alias{read_psv}
 \alias{read_pars}
 \title{
   Read in parameters from an AD Model Builder run
@@ -10,16 +11,18 @@
 }
 \usage{
 read_pars(fn)
+read_psv(fn,names)
 }
 \arguments{
-  \item{fn}{
-    (character) Base name of AD Model Builder file
-}
+  \item{fn}{(character) Base name of AD Model Builder }
+  \item{names}{(character) Names of variables}
 }
 \details{
-  Given the output from an ADMB run on FOO.tpl, reads the files
-  FOO.par (parameters, log-likelihood, max gradient) and FOO.std (standard
-  deviations, correlations)
+  Given the output from an ADMB run on FOO.tpl, \code{read_pars}
+  reads the files
+  FOO.par (parameters, log-likelihood, max gradient); FOO.std (standard
+  deviations); and FOO.cor (correlations).
+  \code{read_psv} reads the output of MCMC runs
 }
 \value{
   \item{coefficients}{parameter estimates}
