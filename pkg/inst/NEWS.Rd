@@ -4,6 +4,12 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.5}{
+  \itemize{
+    \item remove ggplot2 dependency (removed 'ggplot' option from
+    plot.admb.hist) [to reduce dependency creep in glmmADMB]
+  }
+}
 
 \section{Changes in version 0.7.4}{
   \itemize{

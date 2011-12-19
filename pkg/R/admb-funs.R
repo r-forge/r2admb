@@ -376,13 +376,14 @@ plot.admb_hist <- function(x,type=c("lattice","ggplot"),
   if (dtype=="hist") {
     xx <- rhist(x$hists,pars)
     if (type=="ggplot") {
+      stop("ggplot disabled to avoid dependency")
       ## if (!require(ggplot2)) stop("must install ggplot2 package")
-      X1 <- ""; X2 <- ""  ## hack to circumvent NOTE in R CMD check
-      vplot <- ggplot2::ggplot(xx,aes(x=X1,y=X2))+
-        geom_step()+
-          ## geom_bar(stat="identity",fill="darkgray")+
-          facet_wrap(~param,scales="free")+
-            labs(y="Frequency",x="")
+      ## X1 <- ""; X2 <- ""  ## hack to circumvent NOTE in R CMD check
+      ## vplot <- ggplot2::ggplot(xx,aes(x=X1,y=X2))+
+      ##   geom_step()+
+      ##     ## geom_bar(stat="identity",fill="darkgray")+
+      ##     facet_wrap(~param,scales="free")+
+      ##       labs(y="Frequency",x="")
     } else if (type=="lattice") {
       require(lattice)
       ##barchart(X2~X1|param,data=xx,horiz=FALSE,
@@ -439,10 +440,10 @@ if (FALSE) {
   mz <- melt(zz[1:6],id=1)
   xyplot(value~it|variable,data=mz,type="l",as.table=TRUE,
          scales=list(y=list(relation="free")))
-  ggplot(mz,aes(x=it,y=value))+geom_line()+
-    facet_wrap(~variable,scale="free_y")
-  ggplot(mz,aes(x=value))+geom_density()+
-    facet_wrap(~variable,scale="free")
+  ## ggplot(mz,aes(x=it,y=value))+geom_line()+
+  ##   facet_wrap(~variable,scale="free_y")
+  ## ggplot(mz,aes(x=value))+geom_density()+
+  ##   facet_wrap(~variable,scale="free")
 }
 
 
@@ -541,9 +542,9 @@ read_tpl <- function(f) {
   list(secs=splsec,info=L[sapply(L,nrow)>0])
 }
 
-read_psv <- function(f,names=NULL) {
-  f <- tolower(f) ## arghv
-  fn <- paste(f,"psv",sep=".")
+read_psv <- function(fn,names=NULL) {
+  fn <- tolower(fn) ## arghv
+  fn <- paste(fn,"psv",sep=".")
   if (!file.exists(fn)) stop("no PSV file found")
   ans <- read_admbbin(fn)
   if (is.null(names)) names <- paste("V",seq(ncol(ans)),sep="")
