@@ -10,12 +10,14 @@
   from AD Model Builder output files
 }
 \usage{
-read_pars(fn)
+read_pars(fn,drop_phase=TRUE)
 read_psv(fn,names)
 }
 \arguments{
   \item{fn}{(character) Base name of AD Model Builder }
   \item{names}{(character) Names of variables}
+  \item{drop_phase}{(logical) drop negative-phase (fixed) parameters
+    from results?}
 }
 \details{
   Given the output from an ADMB run on FOO.tpl, \code{read_pars}
@@ -26,12 +28,19 @@ read_psv(fn,names)
 }
 \value{
   \item{coefficients}{parameter estimates}
+  \item{coeflist}{parameter estimates in list format, with proper shape
+    (vectors, matrices, etc.)}
   \item{se}{estimated standard errors of coefficients}
   \item{loglik}{log-likelihood}
   \item{maxgrad}{maximum gradient of log-likelihood surface}
   \item{cor}{correlation matrix}
   \item{vcov}{variance-covariance matrix}
+  \item{npar}{number of parameters}
 }
+\section{Warning}{
+The \code{coeflist} component is untested for data structures more
+complicated than scalars, vectors or matrices (i.e. higher-dimensional
+or ragged arrays)}
 \author{
   Ben Bolker
 }

@@ -28,7 +28,7 @@ rep_pars <- function(parnames) {
   parnames
 }
 
-read_pars <- function (fn) {
+read_pars <- function (fn,drop_phase=TRUE) {
   ## see
   ##  http://admb-project.org/community/admb-meeting-march-29-31/InterfacingADMBwithR.pdf
   ## for an alternate file reader -- does this have equivalent functionality?
@@ -58,7 +58,7 @@ read_pars <- function (fn) {
   npar2 <- length(parlines)  ## number of distinct parameters
   parlen <- count.fields(paste(fn,".par",sep=""))
   parlen2 <- count.fields(paste(fn,".par",sep=""),comment.char="")
-  parnames <- gsub("^# +","",gsub(":$","",tmp2[parlines]))
+  parnames0 <- parnames <- gsub("^# +","",gsub(":$","",tmp2[parlines]))
   parlist <- vector("list",npar2)
   parnameslist <- vector("list",npar2)
   names(parlist) <- parnames
@@ -66,6 +66,8 @@ read_pars <- function (fn) {
   cumline <- 1
   ## browser()
   pp <- c(parlines,length(tmp2)+1)
+  ## reshape parameters properly
+  parid <- numeric(npar2)
   for (i in seq(npar2)) {
     nrows <- diff(pp)[i]-1
     curlines <- cumline:(cumline+nrows-1)
@@ -117,21 +119,34 @@ read_pars <- function (fn) {
     ## (have dropped mc parameters)
     cormat <- as.matrix(cor_dat[1:nsdpar,4+(1:nsdpar)])
     cormat[upper.tri(cormat)] <- t(cormat)[upper.tri(cormat)]
-    ## FIXME ...
-    parnames <- c(parnames,sd_dat[-seq_along(parnames),2])
-    ## parnames <- sd_dat[1:npar, 2]  ## FIXME: check with parnames above
-    if (any(duplicated(parnames))) {
-      parnames <- rep_pars(parnames)
+    ## be careful here -- need to adjust for phase<0 parameters,
+    ##  which will be in parameter vector but not in
+    ##  sd
+    sdparnames <- sd_dat[, 2]
+    misspars <- setdiff(parnames0,sdparnames)
+    ## only names of positive-phase parameters
+    parnames2 <- unlist(parnameslist[!parnames0 %in% misspars])
+    sdparnames <- c(parnames2,sdparnames[-seq_along(parnames2)])
+    ## parnames <- c(parnames,sd_dat[-seq_along(parnames),2])
+    if (any(duplicated(sdparnames))) {
+      sdparnames <- rep_pars(sdparnames)
+    }
+    npar3 <- length(parnames2) ## positive-phase only
+    if (drop_phase) {
+      parlist <- parlist[!parnames0 %in% misspars]
+      est <- unlist(parlist)
+      names(est) <- parnames2
+      npar <- npar3
     }
     std <- sd_dat[, 4]
-    sdrptvals <- sd_dat[-(1:npar),3]
+    sdrptvals <- sd_dat[-(1:npar3),3]
     vcov <- outer(std,std) * cormat
   }
   ## hes <- read_admbbin("admodel.hes")
   ## FIXME: can read this, but I don't know what it means!
   ##  it doesn't seem to be the raw Hessian ...
   names(std) <- rownames(vcov) <- rownames(cormat) <-
-    colnames(vcov) <- colnames(cormat) <- parnames
+    colnames(vcov) <- colnames(cormat) <- sdparnames
   list(coefficients=c(est,sdrptvals),
        coeflist=parlist,
        se=std, loglik=-loglik, maxgrad=-maxgrad, cor=cormat, vcov=vcov,

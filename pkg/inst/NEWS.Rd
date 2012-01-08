@@ -8,6 +8,7 @@
   \itemize{
     \item remove ggplot2 dependency (removed 'ggplot' option from
     plot.admb.hist) [to reduce dependency creep in glmmADMB]
+    \item allow for negative-phase in read_par
   }
 }
 
