@@ -4,6 +4,13 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.5.1}{
+  \itemize{
+    \item export dat_write, add append option, doc tweaks
+    \item structure cleanup
+  }
+}
+
 \section{Changes in version 0.7.5}{
   \itemize{
     \item remove ggplot2 dependency (removed 'ggplot' option from

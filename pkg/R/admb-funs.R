@@ -303,10 +303,10 @@ read_chunk <- function(fn,sep="^#",maxlines=1000) {
   while (!end) {
     tmp <- readLines(fn,n=1)
     if (i>1 && has_sep(tmp)) {
-      end=TRUE
+      end <- TRUE
       pushBack(tmp,fn)
     } else if (length(tmp)==0) {
-      end=TRUE
+      end <- TRUE
     } else {
       ans[i] <- tmp
       i <- i+1
@@ -426,7 +426,7 @@ reptoRlist <- function(fn) {
     if(i!=nv) irr=match(vnam[i+1],ifile) else irr=length(ifile)+1 #next row
     dum=NA
     if(irr-ir==2) dum=as.double(scan(fn,skip=ir,nlines=1,quiet=TRUE,what=""))
-    if(irr-ir>2) dum=as.matrix(read.table(fn,skip=ir,nrow=irr-ir-1,fill=T))
+    if(irr-ir>2) dum=as.matrix(read.table(fn,skip=ir,nrows=irr-ir-1,fill=TRUE))
     if(is.numeric(dum))#Logical test to ensure dealing with numbers
       {
         A[[ vnam[i ]]]=dum
@@ -616,14 +616,14 @@ read_admbbin <- function(fn) {
          
 ## from glmmADMB, by Hans Skaug
 write_dat <- "dat_write" <-
-function (name, L) 
+function (name, L, append=FALSE) 
 {
     n <- nchar(name)
-    if (substring(name, n - 3, n) == ".dat") {
-      file_name <- name
-    } else file_name <- paste(name, "dat", sep = ".")
+    file_name <- if (tools::file_ext(name) == ".dat") {
+      name
+    } else paste(name, "dat", sep = ".")
     cat("# \"", file_name,"\" produced by dat_write() from R2admb ", 
-        date(), "\n", file = file_name, sep = "")
+        date(), "\n", file = file_name, sep = "", append=append)
     for (i in 1:length(L)) {
         x <- L[[i]]
         dc <- data.class(x)
@@ -631,9 +631,9 @@ function (name, L)
           cat("#", names(L)[i], "\n", L[[i]], "\n\n", file = file_name, 
               append = TRUE)
         } else {
-          if (data.class(x) == "matrix") {
+          if (dc == "matrix") {
             cat("#", names(L)[i], "\n", file = file_name, append = TRUE)
-            write.table(L[[i]], , col = FALSE, row = FALSE, quote = FALSE, 
+            write.table(L[[i]], , col.names = FALSE, row.names = FALSE, quote = FALSE, 
                         file = file_name, append = TRUE)
             cat("\n", file = file_name, append = TRUE)
           } else {
@@ -660,7 +660,7 @@ function (name, L)
                 append = TRUE)
         if (data.class(x) == "matrix") {
             cat("#", names(L)[i], "\n", file = file_name, append = TRUE)
-            write.table(L[[i]], , col = FALSE, row = FALSE, quote = FALSE, 
+            write.table(L[[i]], col.names = FALSE, row.names = FALSE, quote = FALSE, 
                 file = file_name, append = TRUE)
             cat("\n", file = file_name, append = TRUE)
         }
@@ -767,11 +767,18 @@ run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),
     args <- paste(args,extra.args)
   }
   if (verbose) cat("running compiled executable with args: '",args,"'...\n")
-  
-  if (.Platform$OS.type=="windows") 
-    res <- shell(paste(fn,".exe ",args," >", fn,".out",sep=""),intern=TRUE)
-  else  
-    res <- system(paste("./",fn,args," 2>",fn,".out",sep=""),intern=TRUE)
+
+  outfn <- paste(fn,"out",sep=".")
+
+  if (.Platform$OS.type=="windows") {
+    cmdname <- paste(fn,".exe")
+    shellcmd <- shell
+  } else {
+    cmdname <- paste("./",fn,sep="")
+    shellcmd <- system
+  }
+  if (!file.exists(cmdname)) stop("executable ",cmdname," not found: did you forget to compile it?")
+  res <- shellcmd(paste(cmdname,args,">",outfn),intern=TRUE)
     
   outfile <- readLines(paste(fn,".out",sep=""))
   ## replace empty res with <empty> ?
