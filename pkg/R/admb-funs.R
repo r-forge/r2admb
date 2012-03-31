@@ -771,7 +771,7 @@ run_admb <- function(fn,verbose=FALSE,mcmc=FALSE,mcmc.opts=mcmc.control(),
   outfn <- paste(fn,"out",sep=".")
 
   if (.Platform$OS.type=="windows") {
-    cmdname <- paste(fn,".exe")
+    cmdname <- paste(fn,".exe",sep="")
     shellcmd <- shell
   } else {
     cmdname <- paste("./",fn,sep="")

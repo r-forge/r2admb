@@ -4,6 +4,12 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.5.2}{
+  \itemize{
+    \item fix Windows bug in run_admb
+  }
+}
+
 \section{Changes in version 0.7.5.1}{
   \itemize{
     \item export dat_write, add append option, doc tweaks
