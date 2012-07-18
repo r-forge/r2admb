@@ -479,7 +479,8 @@ proc_var <- function(s,drop.first=TRUE,maxlen) {
   }
   ## strip comments & whitespace
   s2 <- gsub("^[ \\\t]*","",gsub("[;]*[ \\\t]*$","",strip_comments(s)))
-  s2 <- s2[nchar(s2)>0] 
+  s2 <- s2[nchar(s2)>0]
+  s2 <- s2[!grepl("+[ \\\t]*!!",s2)] ## strip !! lines
   words <- strsplit(s2," ")
   type <- sapply(words,"[[",1)
   rest <- sapply(words,"[[",2)

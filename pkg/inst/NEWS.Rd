@@ -4,6 +4,13 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+\section{Changes in version 0.7.5.3}{
+  \itemize{
+    \item ignore !! *after* beginning of line in variable definitions
+    \item fix mcmc2 bug
+  }
+}
+
 \section{Changes in version 0.7.5.2}{
   \itemize{
     \item fix Windows bug in run_admb

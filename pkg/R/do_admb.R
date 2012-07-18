@@ -25,9 +25,14 @@ run.control <- function(check_tpl=TRUE,
                           mcmult=1,
                           mcmcpars=NULL) {
    if (missing(mcsave)) mcsave <- pmax(1,floor(mcmc/1000))
-   if (mcmc>0 && mcmc2>0) stop("may not specify both mcmc and mcmc2>0")
+   if (mcmc2>0) {
+       if (missing(mcmc)) {
+           mcmc <- 0
+       }
+       if (mcmc>0) stop("may not specify both mcmc and mcmc2>0")
+   }
    r <- list(mcsave=mcsave,mcnoscale=mcnoscale,mcgrope=mcgrope,mcmult=mcmult,mcmcpars=mcmcpars)
-   if (mcmc>0) c(list(mcmc=mcmc),r) else c(list(mcmc2=mcmc2,r))
+   if (mcmc>0) c(list(mcmc=mcmc),r) else c(list(mcmc2=mcmc2),r)
  }
 
  mcmc.args <- function(L) {

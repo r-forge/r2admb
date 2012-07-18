@@ -158,13 +158,13 @@ predfr <-
   \begin{center}
 <<fig1,echo=FALSE,fig=TRUE>>=
 g1  <- ggplot(ReedfrogSizepred,
-             aes(x=TBL,y=Kill/10))+
-  geom_point()+stat_sum(aes(size=factor(..n..)))+
-  geom_smooth()+
-  theme_bw()+
-  labs(size="n",x="Size (total body length",
-       y="Proportion killed")+
-  coord_cartesian(ylim=c(-0.05,0.55))
+              aes(x=TBL,y=Kill/10))+
+    geom_point()+stat_sum(aes(size=factor(..n..)))+
+    geom_smooth()+
+    theme_bw()+
+    labs(size="n",x="Size (total body length",
+         y="Proportion killed")+
+    coord_cartesian(ylim=c(-0.05,0.55))
 startest <- stat_function(fun = function(x) { 0.45*((x/13)*exp(1-x/13)) },
                           lty=2,colour="red")
 print(g1+startest+
