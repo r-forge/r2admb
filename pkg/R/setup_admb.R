@@ -38,9 +38,22 @@ setup_admb <- function(admb_home) {
     }
   }
   Sys.setenv(ADMB_HOME=admb_home)
-  path=Sys.getenv("PATH")
-  pathsepchr <- if (.Platform$OS.type=="windows") ";" else ":"
-  Sys.setenv(PATH=paste(path,paste(admb_home,"bin",sep="/"),
-               sep=pathsepchr))
+  path <- Sys.getenv("PATH")
+  if (.Platform$OS.type=="windows") {
+      ## FIXME: don't know if this is general enough ?
+      ##  are empty elements in path (;;) OK?
+      ##  what happens if compiler is not found ... ?
+      pathsepchr <-  ";"
+      compiler_path <- "C:/MinGW/bin"
+      pathstr <- paste(c(paste(admb_home,c("bin","utilities"),sep="/"),
+                         if (file.exists(compiler_path)) compiler_path else "",
+                         path),collapse=pathsepchr)
+      Sys.setenv(PATH=pathstr)
+  } else {
+      ## assume that compiler etc. are already in PATH ...
+      pathsepchr <-  ":"
+      Sys.setenv(PATH=paste(path,paste(admb_home,"bin",sep="/"),
+                 sep=pathsepchr))
+  }
   admb_home
 }

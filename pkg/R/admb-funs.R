@@ -241,8 +241,8 @@ vcov.admb <- function(object,type=c("par","extra","all"),...) {
   v <- object$vcov
   n <- object$npar
   if (is.null(n)) n <- ncol(v)
-  switch(type,par=v[1:n,1:n],
-         extra=v[-(1:n),-(1:n)],
+  switch(type,par=v[1:n,1:n,drop=FALSE],
+         extra=v[-(1:n),-(1:n),drop=FALSE],
          all=v)
 }
 stdEr.admb <- function(object,type=c("par","extra","all"),...) {
@@ -482,6 +482,7 @@ proc_var <- function(s,drop.first=TRUE,maxlen) {
   s2 <- s2[nchar(s2)>0]
   s2 <- s2[!grepl("+[ \\\t]*!!",s2)] ## strip !! lines
   words <- strsplit(s2," ")
+  words <- lapply(words,function(x) x[nzchar(x)]) ## fix from Jeff Laake
   type <- sapply(words,"[[",1)
   rest <- sapply(words,"[[",2)
   rest2 <- strsplit(gsub("[(),]"," ",rest)," ")
@@ -525,7 +526,10 @@ read_tpl <- function(f) {
   ##  a "SECTION" but is SEPARABLE_FUNCTION or TOP_OF_MAIN_CALCS
   ##  or something ...
   splnames <- sapply(splsec,"[",1)
-  names(splsec) <- gsub("_.+","",splnames)
+  names(splsec) <- ifelse(grepl("SECTION$",splnames),
+                                gsub("_.+","",splnames),
+                                splnames)
+  ## FIXME: disambiguate?
   splsec_proc <- lapply(splsec,drop_calcs)
   L1 <- L2 <- NULL
   pp <- splsec_proc$PARAMETER
