@@ -73,17 +73,19 @@ read_pars <- function (fn,drop_phase=TRUE) {
     curlines <- cumline:(cumline+nrows-1)
     curlen <- sum(parlen[curlines])
     parvals <- par_dat[cumpar:(cumpar+curlen-1)]
-    if (nrows==1) {
+    ## FIXME: can I tell why I wanted this ??
+    ##  commented out 26 Oct 2012
+    ## if (nrows==1) {
       if (curlen==1) {
         parnameslist[[i]] <- parnames[i]
       } else {
         parnameslist[[i]] <- numfmt(parnames[i],curlen)
       }
       parlist[[i]] <- parvals
-    } else {
-      parlist[[i]] <- matrix(parvals,nrow=nrows,byrow=TRUE)
-      parnameslist[[i]] <- numfmt2(parnames[i],dim(parlist[[i]]))
-    }
+    ## } else {
+    ## parlist[[i]] <- matrix(parvals,nrow=nrows,byrow=TRUE)
+    ## parnameslist[[i]] <- numfmt2(parnames[i],dim(parlist[[i]]))
+    ## }
     ## cat(parnames[i],cumline,cumline+nrows-1,cumpar,cumpar+curlen-1,parnameslist[[i]],"\n")
     ## print(parlist[[i]])
     cumline <- cumline + nrows
@@ -97,7 +99,7 @@ read_pars <- function (fn,drop_phase=TRUE) {
   ##},
   ## parnames,parlen)))
   est <- unlist(par_dat)
-  names(est) <- parnames
+  names(est) <- parnames[1:length(est)]
   if (!is.finite(loglik)) warning("bad log-likelihood: fitting problem in ADMB?")
   ## if non-pos-def hessian, cor and std files will be missing ... but
   ##   we should still be able to retrieve some info

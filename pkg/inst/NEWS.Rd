@@ -4,6 +4,12 @@
 \title{R2admb News}
 \encoding{UTF-8}
 
+
+\section{Changes in version 0.7.6}{
+  \itemize{
+    \item bug fixes from Jeff Laake: Windows path, vcov of size 1, empty words
+  }
+}
 \section{Changes in version 0.7.5.3}{
   \itemize{
     \item ignore !! *after* beginning of line in variable definitions
